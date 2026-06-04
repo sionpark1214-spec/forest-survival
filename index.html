@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#0b1a0e" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<title>숲에 생존</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; user-select: none; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0b1a0e;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Malgun Gothic", sans-serif;
+    color: #eaf6ea; touch-action: none; }
+  #app { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 24px; background: radial-gradient(ellipse at 50% 30%, #143a1c 0%, #0b1a0e 70%); }
+  h1 { font-size: 14vw; font-weight: 900; letter-spacing: 2px; line-height: 1.1;
+    background: linear-gradient(180deg, #d7f5b8, #5fbf6a 55%, #2f8a3a);
+    -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: 0 0 50px rgba(80,200,100,0.35); }
+  @media (min-width:520px){ h1{ font-size:64px; } }
+  .sub { margin-top: 10px; font-size: 15px; color: #a9d8b0; letter-spacing: 2px; }
+  .deco { margin: 22px 0; font-size: 40px; }
+  .btn { margin-top: 8px; padding: 16px 56px; font-size: 21px; font-weight: 800; border: none; border-radius: 16px;
+    color: #07210e; background: linear-gradient(180deg, #aef0b2, #4fbf6a); box-shadow: 0 10px 30px rgba(60,180,90,0.4); cursor: pointer; }
+  .btn:active { transform: translateY(2px); }
+  #msg { margin-top: 18px; min-height: 22px; font-size: 15px; color: #aef0b2; font-weight: 700; }
+  .note { position: fixed; bottom: 18px; left: 0; right: 0; font-size: 12px; color: #6f9078; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="deco">🌲🏕️🌲</div>
+  <h1>숲에 생존</h1>
+  <div class="sub">FOREST SURVIVAL</div>
+  <div id="msg"></div>
+  <button class="btn" id="startBtn">시작</button>
+  <div class="note">제작 준비 중 · v0.1</div>
+</div>
+<script>
+  "use strict";
+  document.getElementById("startBtn").addEventListener("click", function () {
+    document.getElementById("msg").textContent = "곧 숲으로 떠납니다… 🌲";
+  });
+</script>
+</body>
+</html>
