@@ -237,6 +237,26 @@ function addFood(k,n){
   S.food[k]+=n; return true;
 }
 
+// ---------- 효과음 (Web Audio, 파일 없이 생성) ----------
+const SFX=(function(){
+  let ac=null, master=null;
+  function ctx(){ if(!ac){ try{ ac=new (window.AudioContext||window.webkitAudioContext)(); master=ac.createGain(); master.gain.value=0.45; master.connect(ac.destination); }catch(e){ return null; } } return ac; }
+  function now(){ return ac.currentTime; }
+  function noiseBuf(dur){ const a=ctx(); const n=Math.max(1,Math.floor(a.sampleRate*dur)); const b=a.createBuffer(1,n,a.sampleRate); const d=b.getChannelData(0); for(let i=0;i<n;i++) d[i]=Math.random()*2-1; return b; }
+  function resume(){ const a=ctx(); if(a && a.state==="suspended") a.resume(); }
+  // 터벅터벅 (걸음)
+  function step(){ const a=ctx(); if(!a)return; const o=a.createOscillator(),g=a.createGain(); o.type="sine"; o.frequency.setValueAtTime(115,now()); o.frequency.exponentialRampToValueAtTime(52,now()+0.09); g.gain.setValueAtTime(0.0001,now()); g.gain.exponentialRampToValueAtTime(0.3,now()+0.01); g.gain.exponentialRampToValueAtTime(0.0001,now()+0.13); o.connect(g).connect(master); o.start(); o.stop(now()+0.14); }
+  // 샤삭 (무기 휘두름)
+  function swing(){ const a=ctx(); if(!a)return; const src=a.createBufferSource(); src.buffer=noiseBuf(0.22); const bp=a.createBiquadFilter(); bp.type="bandpass"; bp.frequency.setValueAtTime(700,now()); bp.frequency.exponentialRampToValueAtTime(3200,now()+0.15); bp.Q.value=1.1; const g=a.createGain(); g.gain.setValueAtTime(0.0001,now()); g.gain.exponentialRampToValueAtTime(0.28,now()+0.02); g.gain.exponentialRampToValueAtTime(0.0001,now()+0.2); src.connect(bp).connect(g).connect(master); src.start(); src.stop(now()+0.22); }
+  // 하악! (맹수 물기)
+  function bite(){ const a=ctx(); if(!a)return; const o=a.createOscillator(); o.type="sawtooth"; o.frequency.setValueAtTime(190,now()); o.frequency.exponentialRampToValueAtTime(65,now()+0.26); const lp=a.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=1300; const g=a.createGain(); g.gain.setValueAtTime(0.0001,now()); g.gain.exponentialRampToValueAtTime(0.4,now()+0.03); g.gain.exponentialRampToValueAtTime(0.0001,now()+0.3); o.connect(lp).connect(g).connect(master); o.start(); o.stop(now()+0.32); const src=a.createBufferSource(); src.buffer=noiseBuf(0.3); const bp=a.createBiquadFilter(); bp.type="bandpass"; bp.frequency.value=420; const g2=a.createGain(); g2.gain.setValueAtTime(0.22,now()); g2.gain.exponentialRampToValueAtTime(0.0001,now()+0.3); src.connect(bp).connect(g2).connect(master); src.start(); src.stop(now()+0.3); }
+  // 찌리릿 (전기)
+  function zap(){ const a=ctx(); if(!a)return; const o=a.createOscillator(); o.type="square"; o.frequency.setValueAtTime(1300,now()); const lfo=a.createOscillator(); lfo.type="square"; lfo.frequency.value=55; const lg=a.createGain(); lg.gain.value=450; lfo.connect(lg).connect(o.frequency); const g=a.createGain(); g.gain.setValueAtTime(0.0001,now()); g.gain.exponentialRampToValueAtTime(0.25,now()+0.02); g.gain.exponentialRampToValueAtTime(0.0001,now()+0.4); o.connect(g).connect(master); o.start(); lfo.start(); o.stop(now()+0.42); lfo.stop(now()+0.42); const src=a.createBufferSource(); src.buffer=noiseBuf(0.4); const hp=a.createBiquadFilter(); hp.type="highpass"; hp.frequency.value=2200; const g2=a.createGain(); g2.gain.setValueAtTime(0.16,now()); g2.gain.exponentialRampToValueAtTime(0.0001,now()+0.4); src.connect(hp).connect(g2).connect(master); src.start(); src.stop(now()+0.4); }
+  // 쿵 (드래곤 강하/착지)
+  function boom(){ const a=ctx(); if(!a)return; const o=a.createOscillator(); o.type="sine"; o.frequency.setValueAtTime(130,now()); o.frequency.exponentialRampToValueAtTime(32,now()+0.5); const g=a.createGain(); g.gain.setValueAtTime(0.0001,now()); g.gain.exponentialRampToValueAtTime(0.6,now()+0.02); g.gain.exponentialRampToValueAtTime(0.0001,now()+0.7); o.connect(g).connect(master); o.start(); o.stop(now()+0.72); const src=a.createBufferSource(); src.buffer=noiseBuf(0.3); const lp=a.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=320; const g2=a.createGain(); g2.gain.setValueAtTime(0.4,now()); g2.gain.exponentialRampToValueAtTime(0.0001,now()+0.3); src.connect(lp).connect(g2).connect(master); src.start(); src.stop(now()+0.3); }
+  return {resume, step, swing, bite, zap, boom};
+})();
+
 // ---------- Three.js ----------
 const canvas = document.getElementById("c");
 let renderer, scene, camera, sun, hemi, ambient;
@@ -676,6 +696,7 @@ function throwElectro(){
 }
 function dragonZap(a){
   lightningFx(a.grp.position, player.position);
+  SFX.zap();
   S.hp-=50; S.stunTime=3; shakeScreen(); whiteFlash();
   toast("⚡ 드래곤 전기 공격! 감전돼서 3초간 못 움직여!");
   if(S.hp<=0 && S.alive){ S.hp=0; deathCinematic("드래곤에게 감전사"); }
@@ -1007,7 +1028,7 @@ function whiteFlash(){ const f=document.getElementById("flashWhite"); f.style.op
 let shake=0;
 function shakeScreen(){ shake=0.4; }
 function shakeObj(o){ const sy=o.scale.y; o.scale.y=sy*0.85; setTimeout(()=>{o.scale.y=sy;},90); }
-function swingArm(){ player.userData.swing=0.35; }
+function swingArm(){ player.userData.swing=0.35; SFX.swing(); }
 function bloodFx(pos){
   for(let i=0;i<6;i++){
     const p=new THREE.Mesh(new THREE.SphereGeometry(0.1,4,4), new THREE.MeshBasicMaterial({color:0xcc0000}));
@@ -1131,6 +1152,7 @@ function updatePlayer(dt){
     player.rotation.y=playerYaw;
     playerWalk+=dt*12;
     if(S.stamina>0) useStamina(3*dt);
+    S._stepT=(S._stepT||0)-dt; if(S._stepT<=0){ SFX.step(); S._stepT=(S.stamina<=0?0.45:0.34); }
   } else playerWalk*=0.8;
   const sw=Math.sin(playerWalk)*0.5;
   player.userData.legL.rotation.x=sw; player.userData.legR.rotation.x=-sw;
@@ -1176,7 +1198,7 @@ function updateAnimals(dt){
       if(a.aggro || d<46){
         a.aggro=true;
         a.swoopCd-=dt;
-        if(!a.swooping && a.swoopCd<=0){ a.swooping=true; a.swoopT=3; a.swoopCd=7; bigMsg("🐉 드래곤이 내려온다! 지금 공격!"); }
+        if(!a.swooping && a.swoopCd<=0){ a.swooping=true; a.swoopT=3; a.swoopCd=7; bigMsg("🐉 드래곤이 내려온다! 지금 공격!"); SFX.boom(); }
         if(a.swooping){ a.swoopT-=dt; if(a.swoopT<=0) a.swooping=false; }
         targetH = a.swooping?2.0:(a.flyH||8);
         const keep = a.swooping?1.5:9;
@@ -1202,6 +1224,7 @@ function updateAnimals(dt){
         if(d<(a.boss?2.6:1.8) && a.atkCd<=0){
           a.atkCd=a.boss?1.8:1.4; S.hp-=a.dmg; damageFlash(); shakeScreen();
           if(a.poison) addPoison();
+          if(a.type==="wolf"||a.type==="tiger"||a.type==="bear") SFX.bite();
           if(a.boss) bigMsg("🐻 곰의 공격!");
           if(S.hp<=0&&S.alive){S.hp=0;deathCinematic(a.boss?"곰에게 당했다":"동물에게 당했다");}
         }
@@ -1355,6 +1378,7 @@ function startGame(){
   if(!THREE_OK){ alert("3D 로딩 실패 (인터넷 확인)"); return; }
   document.getElementById("title").style.display="none";
   ["hud","topright","joy","acts","actLabel"].forEach(id=>document.getElementById(id).classList.remove("hidden"));
+  SFX.resume();
   S.mode="play";
   initThree();
   updateWeaponMesh();
