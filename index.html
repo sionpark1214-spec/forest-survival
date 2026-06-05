@@ -315,13 +315,13 @@ function buildWorld(){
   const ring=new THREE.Mesh(new THREE.RingGeometry(3.2,3.8,24), new THREE.MeshLambertMaterial({color:0xdfeee0}));
   ring.rotation.x=-Math.PI/2; ring.position.copy(springPos); ring.position.y=0.05; scene.add(ring);
 
-  for(let i=0;i<1400;i++){
+  for(let i=0;i<1500;i++){
     let x,z,tries=0;
     do{ x=rnd(-MAP,MAP); z=rnd(-MAP,MAP); tries++; }while((inRiver(x,z)||Math.hypot(x,z)<6||x*x+z*z>MAP*MAP)&&tries<10);
     if(tries>=10) continue;
     trees.push(makeTree(x,z));
   }
-  for(let i=0;i<260;i++){ let x=rnd(-MAP,MAP),z=rnd(-MAP,MAP); if(inRiver(x,z)||Math.hypot(x,z)<5) continue; rocks.push(makeRock(x,z)); }
+  for(let i=0;i<350;i++){ let x=rnd(-MAP,MAP),z=rnd(-MAP,MAP); if(inRiver(x,z)||Math.hypot(x,z)<5) continue; rocks.push(makeRock(x,z)); }
   for(let i=0;i<320;i++){ let x=rnd(-MAP,MAP),z=rnd(-MAP,MAP); if(inRiver(x,z)||Math.hypot(x,z)<5) continue; bushes.push(makeBush(x,z)); }
   for(let i=0;i<160;i++){ let x=rnd(-MAP,MAP),z=rnd(-MAP,MAP); if(inRiver(x,z)||Math.hypot(x,z)<5) continue; herbs.push(makeHerb(x,z)); }
   for(const r of rivers){ for(let i=0;i<4;i++) fishes.push(makeFish(r)); }
