@@ -245,7 +245,7 @@ let houseMesh=null;
 const springPos=new THREE.Vector3(20,0,-22);
 const rivers=[];
 const waterMeshes=[];
-const MAP=110;
+const MAP=700;
 
 function initThree(){
   renderer = new THREE.WebGLRenderer({canvas, antialias:true, powerPreference:"high-performance"});
@@ -256,9 +256,9 @@ function initThree(){
 
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x9fd9ff);
-  scene.fog = new THREE.Fog(0x9fd9ff, 55, 170);
+  scene.fog = new THREE.Fog(0x9fd9ff, 70, 260);
 
-  camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 300);
+  camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 1000);
 
   hemi = new THREE.HemisphereLight(0xcfeaff, 0x335522, 0.7); scene.add(hemi);
   ambient = new THREE.AmbientLight(0xffffff, 0.25); scene.add(ambient);
@@ -315,27 +315,27 @@ function buildWorld(){
   const ring=new THREE.Mesh(new THREE.RingGeometry(3.2,3.8,24), new THREE.MeshLambertMaterial({color:0xdfeee0}));
   ring.rotation.x=-Math.PI/2; ring.position.copy(springPos); ring.position.y=0.05; scene.add(ring);
 
-  for(let i=0;i<520;i++){
+  for(let i=0;i<1400;i++){
     let x,z,tries=0;
     do{ x=rnd(-MAP,MAP); z=rnd(-MAP,MAP); tries++; }while((inRiver(x,z)||Math.hypot(x,z)<6||x*x+z*z>MAP*MAP)&&tries<10);
     if(tries>=10) continue;
     trees.push(makeTree(x,z));
   }
-  for(let i=0;i<85;i++){ let x=rnd(-MAP,MAP),z=rnd(-MAP,MAP); if(inRiver(x,z)||Math.hypot(x,z)<5) continue; rocks.push(makeRock(x,z)); }
-  for(let i=0;i<100;i++){ let x=rnd(-MAP,MAP),z=rnd(-MAP,MAP); if(inRiver(x,z)||Math.hypot(x,z)<5) continue; bushes.push(makeBush(x,z)); }
-  for(let i=0;i<55;i++){ let x=rnd(-MAP,MAP),z=rnd(-MAP,MAP); if(inRiver(x,z)||Math.hypot(x,z)<5) continue; herbs.push(makeHerb(x,z)); }
+  for(let i=0;i<260;i++){ let x=rnd(-MAP,MAP),z=rnd(-MAP,MAP); if(inRiver(x,z)||Math.hypot(x,z)<5) continue; rocks.push(makeRock(x,z)); }
+  for(let i=0;i<320;i++){ let x=rnd(-MAP,MAP),z=rnd(-MAP,MAP); if(inRiver(x,z)||Math.hypot(x,z)<5) continue; bushes.push(makeBush(x,z)); }
+  for(let i=0;i<160;i++){ let x=rnd(-MAP,MAP),z=rnd(-MAP,MAP); if(inRiver(x,z)||Math.hypot(x,z)<5) continue; herbs.push(makeHerb(x,z)); }
   for(const r of rivers){ for(let i=0;i<4;i++) fishes.push(makeFish(r)); }
-  for(let i=0;i<26;i++) bugs.push(makeBug());
+  for(let i=0;i<50;i++) bugs.push(makeBug());
   // 풀잎 (바닥 디테일)
   const grassMats=GREENS.map(c=>new THREE.MeshLambertMaterial({color:c}));
-  for(let i=0;i<1000;i++){
+  for(let i=0;i<3000;i++){
     let x=rnd(-MAP,MAP),z=rnd(-MAP,MAP); if(inRiver(x,z)) continue;
     const t=new THREE.Mesh(new THREE.ConeGeometry(0.1,rnd(0.4,0.95),4), grassMats[i%grassMats.length]);
     t.position.set(x,0.3,z); t.rotation.y=rnd(0,6.28); scene.add(t);
   }
   // 꽃
   const fcol=[0xff6a8a,0xffd23a,0xffffff,0xb06aff,0xff9a4a];
-  for(let i=0;i<110;i++){
+  for(let i=0;i<320;i++){
     let x=rnd(-MAP,MAP),z=rnd(-MAP,MAP); if(inRiver(x,z)) continue;
     const st=new THREE.Mesh(new THREE.CylinderGeometry(0.025,0.025,0.5,4), new THREE.MeshLambertMaterial({color:0x3a8a3a})); st.position.set(x,0.25,z); scene.add(st);
     const fl=new THREE.Mesh(new THREE.SphereGeometry(0.13,6,5), new THREE.MeshLambertMaterial({color:fcol[i%fcol.length]})); fl.position.set(x,0.55,z); scene.add(fl);
@@ -343,7 +343,7 @@ function buildWorld(){
   }
   // 흙 길 자국
   const dirtMat=new THREE.MeshLambertMaterial({color:0x6e5536});
-  for(let i=0;i<40;i++){ let x=rnd(-MAP,MAP),z=rnd(-MAP,MAP); if(inRiver(x,z))continue; const d=new THREE.Mesh(new THREE.CircleGeometry(rnd(1.5,3),7), dirtMat); d.rotation.x=-Math.PI/2; d.position.set(x,0.015,z); scene.add(d); }
+  for(let i=0;i<120;i++){ let x=rnd(-MAP,MAP),z=rnd(-MAP,MAP); if(inRiver(x,z))continue; const d=new THREE.Mesh(new THREE.CircleGeometry(rnd(1.5,3),7), dirtMat); d.rotation.x=-Math.PI/2; d.position.set(x,0.015,z); scene.add(d); }
 }
 const GREENS=[0x2e7d32,0x357d31,0x3a9d3a,0x276b29,0x4aa54a];
 function makeTree(x,z){
