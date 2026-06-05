@@ -221,6 +221,7 @@ const S = {
   has:{ spear:false, axe:false, bow:false },
   dur:{ spear:0, axe:0, bow:0 },
   bowCharge:0,
+  stunTime:0, electro:0,
   house:null, bedPos:null, houseRate:0, houseTempProt:0,
   sleeping:false,
   alive:true, mode:"title",
@@ -460,6 +461,7 @@ const ANIMAL_DEF={
   wolf   :{emoji:"🐺",color:0x888d92,hp:30,dmg:15,meat:30,danger:true,speed:4.2,count:25,size:0.7},
   tiger  :{emoji:"🐯",color:0xe8902a,hp:70,dmg:25,meat:50,danger:true,speed:4.5,count:10,size:0.95},
   bear   :{emoji:"🐻",color:0x6b4423,hp:130,dmg:35,meat:80,danger:true,speed:2.8,count:6,size:1.3,boss:true},
+  dragon :{emoji:"🐉",color:0x7a4ab0,hp:500,dmg:50,meat:200,danger:true,speed:3.4,count:1,size:2.2,boss:true,fly:true,flyH:8,electro:true},
 };
 function spawnAnimals(){
   for(const key in ANIMAL_DEF){
@@ -486,6 +488,20 @@ function makeAnimal(key,d,x,z){
     const head=new THREE.Mesh(new THREE.SphereGeometry(s*0.52,8,7), mat); head.position.set(Math.sin(-1.1)*s*0.35,s*0.46,-3.5*s*0.5); head.castShadow=true; g.add(head);
     addEyes(head,s*0.52,-1);
     const tongue=new THREE.Mesh(new THREE.BoxGeometry(s*0.05,s*0.05,s*0.45), new THREE.MeshLambertMaterial({color:0xff3a4a})); tongue.position.set(Math.sin(-1.1)*s*0.35,s*0.46,-3.5*s*0.5-s*0.5); g.add(tongue);
+  } else if(key==="dragon"){
+    const dmat=new THREE.MeshLambertMaterial({color:d.color});
+    const body=new THREE.Mesh(new THREE.SphereGeometry(s*0.7,12,10), dmat); body.scale.set(1,0.85,1.7); body.castShadow=true; g.add(body);
+    const neck=new THREE.Mesh(new THREE.CylinderGeometry(s*0.26,s*0.4,s*1.2,8), dmat); neck.position.set(0,s*0.55,s*0.9); neck.rotation.x=-0.6; g.add(neck);
+    const head=new THREE.Mesh(new THREE.BoxGeometry(s*0.55,s*0.5,s*0.8), dmat); head.position.set(0,s*1.0,s*1.5); g.add(head);
+    for(const ex of [-1,1]){ const eye=new THREE.Mesh(new THREE.SphereGeometry(s*0.1,7,6), new THREE.MeshBasicMaterial({color:0x9affff})); eye.position.set(ex*s*0.18,s*1.1,s*1.82); g.add(eye); }
+    for(const ex of [-1,1]){ const horn=new THREE.Mesh(new THREE.ConeGeometry(s*0.09,s*0.55,5), new THREE.MeshLambertMaterial({color:0xe8e0ff})); horn.position.set(ex*s*0.18,s*1.42,s*1.25); horn.rotation.x=-0.4; g.add(horn); }
+    // 날개(펄럭임)
+    const wingMat=new THREE.MeshLambertMaterial({color:0x8a4ac0, side:THREE.DoubleSide, transparent:true, opacity:0.93});
+    const wl=new THREE.Group(); const wlm=new THREE.Mesh(new THREE.ConeGeometry(s*1.7,0.18,3), wingMat); wlm.rotation.z=Math.PI/2; wlm.position.x=-s*1.5; wl.add(wlm); wl.position.set(-s*0.25,s*0.4,0); g.add(wl);
+    const wr=new THREE.Group(); const wrm=new THREE.Mesh(new THREE.ConeGeometry(s*1.7,0.18,3), wingMat); wrm.rotation.z=-Math.PI/2; wrm.position.x=s*1.5; wr.add(wrm); wr.position.set(s*0.25,s*0.4,0); g.add(wr);
+    g.userData.wingL=wl; g.userData.wingR=wr;
+    const tail=new THREE.Mesh(new THREE.ConeGeometry(s*0.3,s*2.0,6), dmat); tail.rotation.x=Math.PI/2.1; tail.position.set(0,0,-s*1.7); g.add(tail);
+    for(const ex of [-1,1]){ const leg=new THREE.Mesh(new THREE.BoxGeometry(s*0.26,s*0.6,s*0.26), dmat); leg.position.set(ex*s*0.4,-s*0.55,s*0.2); g.add(leg); }
   } else {
     const body=new THREE.Mesh(new THREE.BoxGeometry(s*1.3,s*0.95,s*2), mat); body.position.y=s*0.95; body.castShadow=true; g.add(body);
     const head=new THREE.Mesh(new THREE.BoxGeometry(s*0.85,s*0.8,s*0.8), mat); head.position.set(0,s*1.2,s*1.05); head.castShadow=true; g.add(head);
@@ -530,7 +546,8 @@ function makeAnimal(key,d,x,z){
   const lbl=mkLabel(d.emoji); lbl.position.y=s*2.4+0.4; g.add(lbl);
   scene.add(g);
   return {grp:g, type:key, hp:d.hp, maxhp:d.hp, dmg:d.dmg, meat:d.meat, danger:d.danger,
-          speed:d.speed, poison:!!d.poison, boss:!!d.boss, vx:0,vz:0, atkCd:0, wander:rnd(0,6), aggro:false, alive:true};
+          speed:d.speed, poison:!!d.poison, boss:!!d.boss, fly:!!d.fly, flyH:d.flyH||0, zapCd:0, flap:0,
+          vx:0,vz:0, atkCd:0, wander:rnd(0,6), aggro:false, alive:true};
 }
 function mkLabel(txt){
   const cv=document.createElement("canvas"); cv.width=cv.height=64;
@@ -612,6 +629,7 @@ function damageWeapon(){
 }
 function attack(){
   if(S.mode!=="play"||!S.alive) return;
+  if(S.weapon==="electro"){ throwElectro(); return; }
   if(S.stamina<=0){ toast("힘이 없어! 😵 쉬어야 해"); return; }
   const dmg=weaponDmg();
   let best=null,bd=3.6;
@@ -619,14 +637,64 @@ function attack(){
   swingArm(); useStamina(6); damageWeapon();
   if(best) hitAnimal(best,dmg); else toast("허공을 휘둘렀다…");
 }
+function dropMeat(a){
+  if(a.type==="dragon"){
+    S.electro+=3;
+    bigMsg("🐉 드래곤 처치!! ⚡ 일렉트볼 3개 획득!");
+    toast("🏆 숲의 전설을 쓰러뜨렸다!");
+    let got=0; while(foodCount()<S.maxSlots && got<3){ S.food.rawmeat++; got++; }
+    return;
+  }
+  const drop=Math.max(1,Math.round(ANIMAL_DEF[a.type].meat/15));
+  let got=0; for(let i=0;i<drop;i++){ if(foodCount()<S.maxSlots){ S.food.rawmeat++; got++; } }
+  toast(ANIMAL_DEF[a.type].emoji+" 사냥! 날고기 +"+got+(got<drop?" (가방 꽉참)":" 🍖"));
+}
 function hitAnimal(a,dmg){
   a.hp-=dmg; bloodFx(a.grp.position);
   if(a.danger && a.hp>0) a.aggro=true;
   if(a.hp<=0){
     a.alive=false; scene.remove(a.grp);
-    addFood("rawmeat",1);
-    toast(ANIMAL_DEF[a.type].emoji+" 사냥 성공! 날고기 +1 🍖");
+    dropMeat(a);
   }
+}
+function throwElectro(){
+  if(S.electro<=0){ toast("일렉트볼이 없어! ⚡"); S.weapon="hand"; updateWeaponMesh(); return; }
+  S.electro--;
+  const fx=Math.sin(playerYaw), fz=Math.cos(playerYaw);
+  const ex=player.position.x+fx*8, ez=player.position.z+fz*8;
+  electricExplosion(ex,ez); swingArm();
+  let kills=0;
+  for(const a of animals){ if(!a.alive) continue;
+    if(Math.hypot(a.grp.position.x-ex,a.grp.position.z-ez)<5){
+      a.hp-=100; bloodFx(a.grp.position); if(a.danger)a.aggro=true;
+      if(a.hp<=0){ a.alive=false; scene.remove(a.grp); kills++; }
+    }
+  }
+  toast("⚡ 일렉트볼 폭발! 100뎀"+(kills?" ("+kills+"마리!)":""));
+  if(S.electro<=0){ S.weapon="hand"; updateWeaponMesh(); }
+}
+function dragonZap(a){
+  lightningFx(a.grp.position, player.position);
+  S.hp-=50; S.stunTime=3; shakeScreen(); whiteFlash();
+  toast("⚡ 드래곤 전기 공격! 감전돼서 3초간 못 움직여!");
+  if(S.hp<=0 && S.alive){ S.hp=0; deathCinematic("드래곤에게 감전사"); }
+}
+function lightningFx(from,to){
+  const a=new THREE.Vector3(from.x,from.y,from.z), b=new THREE.Vector3(to.x,to.y+1.2,to.z);
+  const dir=new THREE.Vector3().subVectors(b,a); const len=dir.length();
+  const bolt=new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.14,len,5), new THREE.MeshBasicMaterial({color:0xaef0ff}));
+  bolt.position.copy(a).add(b).multiplyScalar(0.5);
+  bolt.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir.clone().normalize());
+  scene.add(bolt); setTimeout(()=>scene.remove(bolt),200);
+}
+function electricExplosion(x,z){
+  const g=new THREE.Group();
+  const ball=new THREE.Mesh(new THREE.SphereGeometry(1.2,10,8), new THREE.MeshBasicMaterial({color:0x7adfff,transparent:true,opacity:0.85}));
+  ball.position.set(x,1.3,z); g.add(ball);
+  const light=new THREE.PointLight(0x7adfff,3,16); light.position.set(x,2,z); g.add(light);
+  for(let i=0;i<8;i++){ const bz=new THREE.Mesh(new THREE.BoxGeometry(0.12,0.12,rnd(1.2,2.6)), new THREE.MeshBasicMaterial({color:0xaef0ff})); bz.position.set(x,1.4,z); bz.rotation.y=i/8*6.28; g.add(bz); }
+  scene.add(g); whiteFlash();
+  let tt=0; const iv=setInterval(()=>{ tt+=0.05; ball.scale.setScalar(1+tt*4); ball.material.opacity=Math.max(0,0.85-tt*1.7); if(tt>0.5){ clearInterval(iv); scene.remove(g); } },30);
 }
 function shootArrow(){
   if(S.mat.arrow<=0){ toast("화살이 없어! 🏹"); S.bowCharge=0; return; }
@@ -997,6 +1065,7 @@ function renderBag(){
   if(S.has.spear)wl.push(["spear","🪵","나무창("+S.dur.spear+")"]);
   if(S.has.axe)wl.push(["axe","🪓","돌도끼("+S.dur.axe+")"]);
   if(S.has.bow)wl.push(["bow","🏹","활("+S.dur.bow+")"]);
+  if(S.electro>0)wl.push(["electro","⚡","일렉트볼 x"+S.electro+" (100뎀)"]);
   for(const w of wl){
     const k=w[0];
     const div=document.createElement("div"); div.className="row";
@@ -1010,7 +1079,7 @@ function updateWeaponMesh(){
   const w=player.userData.weaponMesh;
   if(S.weapon==="hand"){ w.visible=false; return; }
   w.visible=true;
-  const colors={spear:0x9a6a2a, axe:0x8a8f96, bow:0x6b4423};
+  const colors={spear:0x9a6a2a, axe:0x8a8f96, bow:0x6b4423, electro:0x7adfff};
   w.material.color.setHex(colors[S.weapon]||0x8a5a2a);
 }
 
@@ -1042,6 +1111,13 @@ function updatePlayer(dt){
     S.hp=Math.min(100,S.hp+S.houseRate*dt*6);
     S.stamina=Math.min(100,S.stamina+8*dt*6);
     S.phaseTime-=dt*6;
+    return;
+  }
+  if(S.stunTime>0){
+    S.stunTime-=dt;
+    const v=document.getElementById("vig");
+    v.style.boxShadow = S.stunTime>0 ? "inset 0 0 110px 26px rgba(110,180,255,0.5)" : "inset 0 0 0 0 rgba(0,0,0,0)";
+    player.position.x+=rnd(-0.02,0.02); player.position.z+=rnd(-0.02,0.02);
     return;
   }
   let mx=joy.x, mz=joy.y;
@@ -1090,6 +1166,25 @@ function updateAnimals(dt){
     const dx=player.position.x-p.x, dz=player.position.z-p.z;
     const d=Math.hypot(dx,dz)||1;
     a.wander-=dt; a.atkCd-=dt;
+    if(a.fly){
+      a.flap+=dt*8;
+      const ud=a.grp.userData;
+      if(ud.wingL){ ud.wingL.rotation.z=0.4+Math.sin(a.flap)*0.55; ud.wingR.rotation.z=-0.4-Math.sin(a.flap)*0.55; }
+      a.zapCd-=dt;
+      if(a.aggro || d<46){
+        a.aggro=true;
+        if(d>9){ p.x+=dx/d*a.speed*dt; p.z+=dz/d*a.speed*dt; }
+        a.grp.rotation.y=Math.atan2(dx,dz);
+        if(d<26 && a.zapCd<=0){ a.zapCd=2.6; dragonZap(a); }
+      } else {
+        if(a.wander<=0){ a.vx=rnd(-1,1); a.vz=rnd(-1,1); a.wander=rnd(2,5); }
+        let nx=p.x+a.vx*a.speed*dt, nz=p.z+a.vz*a.speed*dt;
+        if(Math.hypot(nx,nz)<MAP){ p.x=nx; p.z=nz; }
+        a.grp.rotation.y=Math.atan2(a.vx||0.01,a.vz||0.01);
+      }
+      a.grp.position.y=(a.flyH||8)+Math.sin(t0()*1.5)*0.7;
+      continue;
+    }
     let tx=0,tz=0;
     if(a.danger){
       const aggroR = a.boss?16:6;
