@@ -547,6 +547,7 @@ function makeAnimal(key,d,x,z){
   scene.add(g);
   return {grp:g, type:key, hp:d.hp, maxhp:d.hp, dmg:d.dmg, meat:d.meat, danger:d.danger,
           speed:d.speed, poison:!!d.poison, boss:!!d.boss, fly:!!d.fly, flyH:d.flyH||0, zapCd:0, flap:0,
+          swoopCd:5, swooping:false, swoopT:0,
           vx:0,vz:0, atkCd:0, wander:rnd(0,6), aggro:false, alive:true};
 }
 function mkLabel(txt){
@@ -1171,18 +1172,26 @@ function updateAnimals(dt){
       const ud=a.grp.userData;
       if(ud.wingL){ ud.wingL.rotation.z=0.4+Math.sin(a.flap)*0.55; ud.wingR.rotation.z=-0.4-Math.sin(a.flap)*0.55; }
       a.zapCd-=dt;
+      let targetH=(a.flyH||8);
       if(a.aggro || d<46){
         a.aggro=true;
-        if(d>9){ p.x+=dx/d*a.speed*dt; p.z+=dz/d*a.speed*dt; }
+        a.swoopCd-=dt;
+        if(!a.swooping && a.swoopCd<=0){ a.swooping=true; a.swoopT=3; a.swoopCd=7; bigMsg("🐉 드래곤이 내려온다! 지금 공격!"); }
+        if(a.swooping){ a.swoopT-=dt; if(a.swoopT<=0) a.swooping=false; }
+        targetH = a.swooping?2.0:(a.flyH||8);
+        const keep = a.swooping?1.5:9;
+        const ms = a.speed*(a.swooping?1.7:1);
+        if(d>keep){ p.x+=dx/d*ms*dt; p.z+=dz/d*ms*dt; }
         a.grp.rotation.y=Math.atan2(dx,dz);
-        if(d<26 && a.zapCd<=0){ a.zapCd=2.6; dragonZap(a); }
+        if(!a.swooping && d<26 && a.zapCd<=0){ a.zapCd=2.6; dragonZap(a); }
       } else {
         if(a.wander<=0){ a.vx=rnd(-1,1); a.vz=rnd(-1,1); a.wander=rnd(2,5); }
         let nx=p.x+a.vx*a.speed*dt, nz=p.z+a.vz*a.speed*dt;
         if(Math.hypot(nx,nz)<MAP){ p.x=nx; p.z=nz; }
         a.grp.rotation.y=Math.atan2(a.vx||0.01,a.vz||0.01);
       }
-      a.grp.position.y=(a.flyH||8)+Math.sin(t0()*1.5)*0.7;
+      const bob=Math.sin(t0()*1.5)*0.5;
+      a.grp.position.y += ((targetH+bob) - a.grp.position.y) * Math.min(1, dt*2.5);
       continue;
     }
     let tx=0,tz=0;
