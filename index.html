@@ -288,7 +288,7 @@ const SFX=(function(){
 const canvas = document.getElementById("c");
 let renderer, scene, camera, sun, hemi, ambient;
 let player, playerYaw=0, playerWalk=0;
-const trees=[], rocks=[], bushes=[], herbs=[], animals=[], fishes=[], bugs=[], drops=[], campfires=[], spikes=[];
+const trees=[], rocks=[], bushes=[], herbs=[], animals=[], fishes=[], bugs=[], drops=[], campfires=[], spikes=[], walls=[];
 let houseMesh=null;
 const springPos=new THREE.Vector3(20,0,-22);
 const rivers=[];
@@ -784,6 +784,7 @@ function doAction(){
   if(n.kind==="heli"){ boardHeli(); return; }
   if(n.kind==="bed"){ sleep(); return; }
   if(n.kind==="campfire"){ cook(); return; }
+  if(n.kind==="wall"){ repairWall(n.obj); return; }
   if(n.kind==="water"){ drink(n.clean); return; }
   if(n.kind==="bug"){ catchBug(n.obj); return; }
   if(n.kind==="fish"){ catchFish(n.obj); return; }
@@ -867,6 +868,7 @@ const RECIPES=[
   {id:"arrow", name:"화살 x2", emoji:"➶", cost:{wood:4,stone:1}, desc:"활에 필요 (최대 100)", make(){ S.mat.arrow=Math.min(100,S.mat.arrow+2); }},
   {id:"fire", name:"모닥불", emoji:"🔥", cost:{wood:3,stone:2}, desc:"체온↑ 힘↑ 회복 · 요리", make(){ placeCampfire(); }},
   {id:"spike", name:"나무 스파이크", emoji:"🌵", cost:{wood:6}, desc:"바닥에 설치 · 동물이 밟으면 아픔(나는 안전!)", make(){ placeSpike(); }},
+  {id:"wall", name:"나무 벽", emoji:"🧱", cost:{wood:10}, desc:"동물을 막음 · 체력300 · 가까이서 나무3으로 +100 수리", make(){ placeWall(); }},
 ];
 const HOUSES=[
   {id:"h1", name:"엉성한 나무집", emoji:"🛖", cost:{wood:15,stone:3}, rate:1/60, prot:0.3, desc:"체력 1분에 1"},
@@ -912,6 +914,33 @@ function placeSpike(){
   for(let i=0;i<8;i++){ const s=new THREE.Mesh(new THREE.ConeGeometry(0.16,rnd(0.8,1.3),5), spikeMat); s.position.set(rnd(-0.7,0.7),0.6,rnd(-0.7,0.7)); s.rotation.set(rnd(-0.15,0.15),0,rnd(-0.15,0.15)); g.add(s); }
   g.position.set(x,0,z); scene.add(g);
   spikes.push({grp:g, x, z, hp:90});
+}
+function placeWall(){
+  const x=player.position.x+Math.sin(playerYaw)*2.5, z=player.position.z+Math.cos(playerYaw)*2.5;
+  const ux=Math.cos(playerYaw), uz=-Math.sin(playerYaw);   // 길이 축
+  const vx=Math.sin(playerYaw), vz=Math.cos(playerYaw);    // 두께(정면) 축
+  const g=new THREE.Group();
+  const wall=new THREE.Mesh(new THREE.BoxGeometry(5,2.4,0.55), new THREE.MeshLambertMaterial({color:0x8a6a3a}));
+  wall.position.y=1.2; wall.castShadow=true; g.add(wall);
+  for(let i=-2;i<=2;i++){ const post=new THREE.Mesh(new THREE.CylinderGeometry(0.26,0.26,2.5,6), new THREE.MeshLambertMaterial({color:0x6b4a28})); post.position.set(i*1.0,1.25,0); g.add(post); }
+  g.position.set(x,0,z); g.rotation.y=playerYaw; scene.add(g);
+  walls.push({grp:g, x, z, ux, uz, vx, vz, halfW:2.5, halfT:0.45, hp:300, maxhp:300});
+}
+function resolveWalls(o, radius){
+  for(const w of walls){
+    const dx=o.x-w.x, dz=o.z-w.z;
+    const u=dx*w.ux+dz*w.uz, v=dx*w.vx+dz*w.vz;
+    if(Math.abs(u)<w.halfW+radius && Math.abs(v)<w.halfT+radius){
+      const sign=v>=0?1:-1, nv=sign*(w.halfT+radius);
+      o.x=w.x+u*w.ux+nv*w.vx; o.z=w.z+u*w.uz+nv*w.vz;
+    }
+  }
+}
+function repairWall(w){
+  if(w.hp>=w.maxhp){ toast("벽이 멀쩡해 🧱"); return; }
+  if(S.mat.wood<3){ toast("수리에 나무 3개 필요! 🪵"); return; }
+  S.mat.wood-=3; w.hp=Math.min(w.maxhp, w.hp+100);
+  toast("🧱 벽 수리! +100 ("+Math.round(w.hp)+"/"+w.maxhp+")");
 }
 function updateSpikes(dt){
   for(let i=spikes.length-1;i>=0;i--){
@@ -1250,6 +1279,7 @@ function updatePlayer(dt){
     let spd = (S.stamina<=0)?3:6;
     playerYaw=Math.atan2(mx,mz);
     let nx=player.position.x+mx*spd*dt, nz=player.position.z+mz*spd*dt;
+    if(walls.length){ const np={x:nx,z:nz}; resolveWalls(np,0.5); nx=np.x; nz=np.z; }
     if(Math.hypot(nx,nz)<MAP){ player.position.x=nx; player.position.z=nz; }
     player.rotation.y=playerYaw;
     playerWalk+=dt*12;
@@ -1338,8 +1368,22 @@ function updateAnimals(dt){
     }
     const sp=a.speed*( (a.danger&&(a.aggro||d<6))?1:0.5 );
     let nx=p.x+tx*sp*dt, nz=p.z+tz*sp*dt;
+    if(walls.length){ const np={x:nx,z:nz}; resolveWalls(np,0.6); nx=np.x; nz=np.z; }
     if(Math.hypot(nx,nz)<MAP && !inRiver(nx,nz)){ p.x=nx; p.z=nz; }
     if(tx||tz) a.grp.rotation.y=Math.atan2(tx,tz);
+    // 벽에 막히면 벽을 때림
+    if(a.danger && walls.length && a.atkCd<=0){
+      for(const w of walls){
+        const adx=p.x-w.x, adz=p.z-w.z, u=adx*w.ux+adz*w.uz, v=adx*w.vx+adz*w.vz;
+        const pv=(player.position.x-w.x)*w.vx+(player.position.z-w.z)*w.vz;
+        if(Math.abs(u)<w.halfW+0.5 && Math.abs(v)<1.4 && (v>=0)!==(pv>=0)){
+          a.atkCd=1.4; w.hp-=a.dmg; shakeObj(w.grp);
+          if(a.type==="wolf"||a.type==="tiger"||a.type==="bear") SFX.bite();
+          if(w.hp<=0){ scene.remove(w.grp); const wi=walls.indexOf(w); if(wi>=0)walls.splice(wi,1); toast("🧱 벽이 부서졌다!"); }
+          break;
+        }
+      }
+    }
   }
 }
 function updateFishBugs(dt){
@@ -1410,6 +1454,7 @@ function updateNearest(){
     for(const f of fishes){ if(f.alive) chk(dist(f.grp.position),"fish",f); }
     for(const b of bugs){ if(b.alive) chk(dist(b.grp.position),"bug",b); }
     for(const f of campfires) chk(dist(f),"campfire",f);
+    for(const w of walls) chk(dist(w),"wall",w);
     if(S.bedPos) chk(dist(S.bedPos),"bed",null);
     if(dist(springPos)<4){ kind="water"; clean=true; best=true; bd=0; }
     else {
@@ -1423,10 +1468,10 @@ function updateNearest(){
   S.near = best ? {kind, obj, clean} : null;
   const lbl=document.getElementById("actLabel");
   const txt={tree:"🪵 나무 베기",rock:"🪨 돌 캐기",bush:"🌿 덩굴 줍기",herb:"🩹 약초 캐기",
-    fish:"🐟 물고기 잡기",bug:"🐛 벌레 잡기",campfire:"🔥 요리하기",bed:"😴 자기",water:"💧 물 마시기",heli:"🚁 헬기 타기"};
-  const actTxt={tree:"베기",rock:"캐기",bush:"줍기",herb:"캐기",fish:"잡기",bug:"잡기",campfire:"요리",bed:"자기",water:"마시기",heli:"타기"};
+    fish:"🐟 물고기 잡기",bug:"🐛 벌레 잡기",campfire:"🔥 요리하기",bed:"😴 자기",water:"💧 물 마시기",heli:"🚁 헬기 타기",wall:"🧱 벽 수리"};
+  const actTxt={tree:"베기",rock:"캐기",bush:"줍기",herb:"캐기",fish:"잡기",bug:"잡기",campfire:"요리",bed:"자기",water:"마시기",heli:"타기",wall:"수리"};
   if(S.sleeping){ lbl.textContent="😴 자는 중 (행동=일어나기)"; lbl.classList.remove("hidden"); document.getElementById("bActTxt").textContent="기상"; }
-  else if(S.near){ lbl.textContent=txt[S.near.kind]||""; lbl.classList.remove("hidden"); document.getElementById("bActTxt").textContent=actTxt[S.near.kind]||"행동"; }
+  else if(S.near){ let lt=txt[S.near.kind]||""; if(S.near.kind==="wall"&&S.near.obj) lt="🧱 벽 수리 (나무3→+100) "+Math.round(S.near.obj.hp)+"/300"; lbl.textContent=lt; lbl.classList.remove("hidden"); document.getElementById("bActTxt").textContent=actTxt[S.near.kind]||"행동"; }
   else { lbl.classList.add("hidden"); document.getElementById("bActTxt").textContent="행동"; }
 }
 function updateDrops(dt){
