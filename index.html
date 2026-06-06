@@ -1568,7 +1568,7 @@ function netJoin(){
   NET.peer=new Peer();
   NET.peer.on("open",()=>{
     NET.selfId=NET.peer.id;
-    const conn=NET.peer.connect("forestsv-"+code);
+    const conn=NET.peer.connect("forestsv-"+code, {reliable:true});
     NET.host=conn;
     conn.on("open",()=>{ conn.send({t:"hello",name:NET.name}); mpStatus("연결됐어! 방장이 시작하길 기다려…"); });
     conn.on("data",m=>{
