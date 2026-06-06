@@ -918,7 +918,7 @@ function updateSpikes(dt){
     const sp=spikes[i];
     for(const a of animals){ if(!a.alive) continue; if(a.fly) continue;
       if(Math.hypot(a.grp.position.x-sp.x,a.grp.position.z-sp.z)<1.6){
-        const dmg=16*dt; a.hp-=dmg; sp.hp-=dmg;
+        const dmg=5*dt; a.hp-=dmg; sp.hp-=dmg;
         if(a.danger) a.aggro=true;
         if(Math.random()<dt*3) bloodFx(a.grp.position);
         if(a.hp<=0){ a.alive=false; scene.remove(a.grp); dropMeat(a); }
