@@ -661,7 +661,7 @@ function lookMove(e){
   let t=e;
   if(e.changedTouches){ t=null; for(const c of e.changedTouches){ if(c.identifier===look.id){t=c;break;} } if(!t) return; }
   const dx=t.clientX-look.lx, dy=t.clientY-look.ly; look.lx=t.clientX; look.ly=t.clientY;
-  camYaw += dx*0.006;
+  camYaw -= dx*0.006;
   camPitch = Math.max(0.16, Math.min(1.35, camPitch - dy*0.005));
 }
 function lookEnd(e){ if(e.changedTouches){ let f=false; for(const c of e.changedTouches){ if(c.identifier===look.id) f=true; } if(!f) return; } look.active=false; }
@@ -1299,7 +1299,7 @@ function updatePlayer(dt){
   if(mag>0.15){
     let spd = (S.stamina<=0)?3:6;
     // 카메라 방향 기준 이동
-    const fx=Math.sin(camYaw), fz=Math.cos(camYaw), rx=Math.cos(camYaw), rz=-Math.sin(camYaw);
+    const fx=Math.sin(camYaw), fz=Math.cos(camYaw), rx=-Math.cos(camYaw), rz=Math.sin(camYaw);
     const mvx=fx*(-mz)+rx*mx, mvz=fz*(-mz)+rz*mx;
     playerYaw=Math.atan2(mvx,mvz);
     let nx=player.position.x+mvx*spd*dt, nz=player.position.z+mvz*spd*dt;
