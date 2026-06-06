@@ -1599,22 +1599,22 @@ function netHost(){
     refreshPlayers();
   });
 }
-function netJoin(){
-  if(typeof Peer==="undefined"){ mpStatus("통신 로딩 실패 (인터넷 확인)"); return; }
-  const code=((document.getElementById("codeInput").value||"").trim().toUpperCase());
+function netJoin(codeArg, sv){
+  if(typeof Peer==="undefined"){ if(sv){ resumeSolo(sv); return; } mpStatus("통신 로딩 실패 (인터넷 확인)"); return; }
+  const code=(codeArg || (document.getElementById("codeInput").value||"")).toString().trim().toUpperCase();
   if(code.length!==4){ mpStatus("코드 4글자를 입력해!"); return; }
-  NET.active=true; NET.isHost=false; NET.name=myName();
-  document.getElementById("hostBtn").disabled=true; document.getElementById("joinBtn").disabled=true;
-  mpStatus("연결 중…");
+  NET.active=true; NET.isHost=false; NET.code=code; NET.name= sv? (sv.name||myName()) : myName(); NET._resumeSave=sv||null;
+  if(!sv){ document.getElementById("hostBtn").disabled=true; document.getElementById("joinBtn").disabled=true; mpStatus("연결 중…"); }
+  let connected=false;
   NET.peer=new Peer();
   NET.peer.on("open",()=>{
     NET.selfId=NET.peer.id;
     const conn=NET.peer.connect("forestsv-"+code, {reliable:true});
     NET.host=conn;
-    conn.on("open",()=>{ conn.send({t:"hello",name:NET.name}); mpStatus("연결됐어! 방장이 시작하길 기다려…"); });
+    conn.on("open",()=>{ connected=true; conn.send({t:"hello",name:NET.name}); mpStatus(sv?"서버에 다시 연결됨!":"연결됐어! 방장이 시작하길 기다려…"); });
     conn.on("data",m=>{
       if(m.t==="welcome"){ NET.seed=m.seed; }
-      else if(m.t==="go"){ if(!NET.started){ NET.started=true; NET.playerN=m.n||1; startGame(); } }
+      else if(m.t==="go"){ if(!NET.started){ NET.started=true; NET.playerN=m.n||1; if(NET._resumeSave){ const r=NET._resumeSave; NET._resumeSave=null; startGameResumeMP(r); } else startGame(); } }
       else if(m.t==="snapshot"){ const ps=m.players||{}, ns={}; for(const id in ps){ if(id!==NET.selfId) ns[id]=ps[id]; } NET.states=ns; }
       else if(m.t==="full"){ mpStatus("방이 꽉 찼어 (4명)"); }
     });
@@ -1623,7 +1623,8 @@ function netJoin(){
       if(S.mode==="play"||S.mode==="heli"){ NET.active=false; Object.keys(NET.meshes).forEach(removeRemote); bigMsg("방장이 나갔어! 혼자 이어서 생존 🌲"); }
     });
   });
-  NET.peer.on("error",e=>{ mpStatus("에러("+e.type+") 코드 확인!"); document.getElementById("joinBtn").disabled=false; });
+  NET.peer.on("error",e=>{ if(sv && !connected){ NET.active=false; resumeSolo(sv); return; } mpStatus("에러("+e.type+") 코드 확인!"); document.getElementById("joinBtn").disabled=false; });
+  if(sv){ setTimeout(()=>{ if(!connected && S.mode==="title"){ try{ NET.peer.destroy(); }catch(e){} NET.active=false; resumeSolo(sv); } }, 7000); }
 }
 function mpStart(){ NET.started=true; NET.playerN=NET.conns.length+1; for(const c of NET.conns){ try{ c.send({t:"go",n:NET.playerN}); }catch(e){} } startGame(); }
 function netTick(dt){
@@ -1704,7 +1705,8 @@ function saveGame(){
       bedX:S.bedPos?S.bedPos.x:null, bedZ:S.bedPos?S.bedPos.z:null,
       campfires:campfires.map(c=>({x:c.x,z:c.z})),
       spikes:spikes.map(s=>({x:s.x,z:s.z,hp:Math.round(s.hp)})),
-      walls:walls.map(w=>({x:w.x,z:w.z,a:w.angle,hp:Math.round(w.hp)})) };
+      walls:walls.map(w=>({x:w.x,z:w.z,a:w.angle,hp:Math.round(w.hp)})),
+      mp:NET.active, isHost:NET.isHost, code:NET.code, name:NET.name };
     localStorage.setItem("forestSave", JSON.stringify(sv));
   }catch(e){}
 }
@@ -1726,19 +1728,41 @@ function resumeGame(){
   if(Date.now()-sv.t > 3600000){ clearSave(); return; }
   if(!THREE_OK){ alert("3D 로딩 실패 (인터넷 확인)"); return; }
   if(S.mode!=="title") return;
+  // 멀티(참가자)였으면 원래 방장 서버로 재합류 시도 → 실패하면 혼자
+  if(sv.mp && sv.code && !sv.isHost){
+    document.getElementById("mpBtn").style.display="none";
+    document.getElementById("mpBox").classList.remove("hidden");
+    mpStatus("🔄 서버에 다시 연결 중… (방장 없으면 혼자 시작)");
+    netJoin(sv.code, sv);
+    return;
+  }
+  resumeSolo(sv);
+}
+function showGameUI(){
   document.getElementById("title").style.display="none";
   ["hud","topright","joy","acts","actLabel"].forEach(id=>document.getElementById(id).classList.remove("hidden"));
   SFX.resume();
+}
+function resumeSolo(sv){
+  if(S.mode!=="title") return;
+  NET.active=false; showGameUI();
   worldSeed=sv.seed||1; setSeed(worldSeed);
-  S.mode="play"; initThree(); updateWeaponMesh();
-  applySave(sv);
+  S.mode="play"; initThree(); updateWeaponMesh(); applySave(sv);
   requestAnimationFrame(loop);
   bigMsg("🌲 이어서 생존! "+S.day+"일째");
+}
+function startGameResumeMP(sv){
+  if(S.mode!=="title") return;
+  showGameUI();
+  worldSeed=NET.seed||sv.seed||1; setSeed(worldSeed);
+  S.mode="play"; initThree(); updateWeaponMesh(); applySave(sv);
+  requestAnimationFrame(loop);
+  bigMsg("👥 서버에 다시 합류! "+S.day+"일째");
 }
 document.getElementById("startBtn").addEventListener("click",startGame);
 document.getElementById("mpBtn").addEventListener("click",()=>{ document.getElementById("mpBox").classList.remove("hidden"); document.getElementById("mpBtn").style.display="none"; SFX.resume(); });
 document.getElementById("hostBtn").addEventListener("click",netHost);
-document.getElementById("joinBtn").addEventListener("click",netJoin);
+document.getElementById("joinBtn").addEventListener("click",()=>netJoin());
 document.getElementById("mpStartBtn").addEventListener("click",mpStart);
 document.getElementById("resumeBtn").addEventListener("click",resumeGame);
 addEventListener("pagehide",saveGame);
