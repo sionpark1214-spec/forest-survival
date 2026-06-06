@@ -1586,18 +1586,45 @@ function netHost(){
   NET.peer=new Peer("forestsv-"+NET.code);
   NET.peer.on("open",()=>{ document.getElementById("mpStatus").innerHTML='방 코드: <span id="mpCode">'+NET.code+'</span><br>친구한테 알려줘! 다 모이면 시작 눌러!'; document.getElementById("mpStartBtn").style.display=""; refreshPlayers(); });
   NET.peer.on("error",e=>{ mpStatus("에러("+e.type+") 다시 시도"); document.getElementById("hostBtn").disabled=false; });
-  NET.peer.on("connection",conn=>{
-    if(NET.conns.length>=3){ conn.on("open",()=>conn.send({t:"full"})); return; }
-    NET.conns.push(conn);
-    conn.on("open",()=>{ conn.send({t:"welcome",seed:NET.seed}); if(NET.started) conn.send({t:"go",n:NET.playerN}); });
-    conn.on("data",m=>{
-      if(m.t==="hello"){ NET.states[conn.peer]=Object.assign(NET.states[conn.peer]||{},{name:m.name}); }
-      else if(m.t==="state"){ NET.states[conn.peer]=Object.assign(NET.states[conn.peer]||{}, m.s); }
-      refreshPlayers();
-    });
-    conn.on("close",()=>{ NET.conns=NET.conns.filter(c=>c!==conn); delete NET.states[conn.peer]; removeRemote(conn.peer); refreshPlayers(); });
+  NET.peer.on("connection",hostAcceptConn);
+}
+function hostAcceptConn(conn){
+  if(NET.conns.length>=3){ conn.on("open",()=>conn.send({t:"full"})); return; }
+  NET.conns.push(conn);
+  conn.on("open",()=>{ conn.send({t:"welcome",seed:NET.seed}); if(NET.started) conn.send({t:"go",n:NET.playerN}); });
+  conn.on("data",m=>{
+    if(m.t==="hello"){ NET.states[conn.peer]=Object.assign(NET.states[conn.peer]||{},{name:m.name}); }
+    else if(m.t==="state"){ NET.states[conn.peer]=Object.assign(NET.states[conn.peer]||{}, m.s); }
     refreshPlayers();
   });
+  conn.on("close",()=>{ NET.conns=NET.conns.filter(c=>c!==conn); delete NET.states[conn.peer]; removeRemote(conn.peer); refreshPlayers(); });
+  refreshPlayers();
+}
+// 방장이 나가면 참가자 중 하나가 새 방장이 됨(방 코드 유지) → 모두 재합류 가능
+function migrateHost(code){
+  Object.keys(NET.meshes).forEach(removeRemote); NET.states={};
+  try{ if(NET.peer) NET.peer.destroy(); }catch(e){}
+  NET.active=true;
+  const p=new Peer("forestsv-"+code); let ok=false;
+  p.on("open",()=>{ ok=true; NET.peer=p; NET.isHost=true; NET.code=code; NET.selfId="host"; NET.conns=[]; NET.started=true; NET.seed=worldSeed; NET.playerN=NET.playerN||1;
+    p.on("connection",hostAcceptConn);
+    bigMsg("👑 네가 새 방장이 됐어! 친구들 다시 모여라");
+  });
+  p.on("error",e=>{ if(ok) return;
+    if(e.type==="unavailable-id"){ setTimeout(()=>rejoinAsPlayer(code), 700); }
+    else { NET.active=false; bigMsg("혼자 이어서 생존 🌲"); }
+  });
+}
+function rejoinAsPlayer(code){
+  try{ if(NET.peer) NET.peer.destroy(); }catch(e){}
+  NET.isHost=false; NET.active=true;
+  const p=new Peer(); NET.peer=p;
+  p.on("open",()=>{ NET.selfId=p.id; const conn=p.connect("forestsv-"+code,{reliable:true}); NET.host=conn;
+    conn.on("open",()=>conn.send({t:"hello",name:NET.name}));
+    conn.on("data",m=>{ if(m.t==="snapshot"){ const ps=m.players||{},ns={}; for(const id in ps){ if(id!==NET.selfId) ns[id]=ps[id]; } NET.states=ns; } });
+    conn.on("close",()=>{ if(S.mode==="play"||S.mode==="heli") migrateHost(code); });
+  });
+  p.on("error",e=>{ setTimeout(()=>{ if((S.mode==="play"||S.mode==="heli") && (!NET.host||!NET.host.open)){ NET.active=false; bigMsg("혼자 이어서 생존 🌲"); } },2500); });
 }
 function netJoin(codeArg, sv){
   if(typeof Peer==="undefined"){ if(sv){ resumeSolo(sv); return; } mpStatus("통신 로딩 실패 (인터넷 확인)"); return; }
@@ -1620,7 +1647,7 @@ function netJoin(codeArg, sv){
     });
     conn.on("close",()=>{
       mpStatus("연결이 끊겼어");
-      if(S.mode==="play"||S.mode==="heli"){ NET.active=false; Object.keys(NET.meshes).forEach(removeRemote); bigMsg("방장이 나갔어! 혼자 이어서 생존 🌲"); }
+      if(S.mode==="play"||S.mode==="heli"){ bigMsg("방장이 나갔어! 방을 넘겨받는 중…"); migrateHost(NET.code); }
     });
   });
   NET.peer.on("error",e=>{ if(sv && !connected){ NET.active=false; resumeSolo(sv); return; } mpStatus("에러("+e.type+") 코드 확인!"); document.getElementById("joinBtn").disabled=false; });
@@ -1728,11 +1755,11 @@ function resumeGame(){
   if(Date.now()-sv.t > 3600000){ clearSave(); return; }
   if(!THREE_OK){ alert("3D 로딩 실패 (인터넷 확인)"); return; }
   if(S.mode!=="title") return;
-  // 멀티(참가자)였으면 원래 방장 서버로 재합류 시도 → 실패하면 혼자
-  if(sv.mp && sv.code && !sv.isHost){
+  // 멀티였으면 그 방 코드로 재합류 시도(방장도 가능) → 아무도 없으면 혼자
+  if(sv.mp && sv.code){
     document.getElementById("mpBtn").style.display="none";
     document.getElementById("mpBox").classList.remove("hidden");
-    mpStatus("🔄 서버에 다시 연결 중… (방장 없으면 혼자 시작)");
+    mpStatus("🔄 서버에 다시 연결 중… (방 없으면 혼자 시작)");
     netJoin(sv.code, sv);
     return;
   }
