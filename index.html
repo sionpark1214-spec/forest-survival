@@ -1085,8 +1085,21 @@ function resolveHeliWin(){
   const bearsAlive=animals.filter(a=>a.type==="bear"&&a.alive).length;
   const dragonAlive=animals.some(a=>a.type==="dragon"&&a.alive);
   const bossesDead = (bearsAlive===0 && !dragonAlive);
-  if(S.heliRound>=3 && bossesDead){ winCinematic(); return; }
-  crashBackCinematic(bearsAlive, dragonAlive);
+  if(S.heliRound>=3){
+    if(bossesDead) winCinematic();
+    else bossSmashCinematic(bearsAlive, dragonAlive);   // 보스 안 잡고 탈출 시도 → 추락사
+  } else {
+    crashBackCinematic(bearsAlive, dragonAlive);
+  }
+}
+function bossSmashCinematic(bearsAlive,dragonAlive){
+  S.mode="cine"; document.getElementById("cine").classList.add("show"); S.cineAction=null;
+  setCine("🚁","헬기가 집으로 날아간다…","드디어 탈출인가?");
+  document.getElementById("cineBtn").style.display="none";
+  const emo=((dragonAlive?"🐉":"")+(bearsAlive>0?"🐻":""))||"😱";
+  setTimeout(()=>{ setCine(emo,"안 잡은 보스가 쫓아왔다!","헬기를 향해 돌진!"); whiteFlash(); },2000);
+  setTimeout(()=>{ setCine("💥","보스가 헬기를 부쉈다!",""); whiteFlash(); },3700);
+  setTimeout(()=>{ setCine("💀","추락사…","보스를 다 잡았어야 했어!"); const b=document.getElementById("cineBtn"); b.style.display=""; b.textContent="타이틀로"; },5000);
 }
 function crashBackCinematic(bearsAlive,dragonAlive){
   S.mode="cine"; document.getElementById("cine").classList.add("show");
