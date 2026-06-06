@@ -126,7 +126,7 @@
   <div class="deco">🌲🏕️🌲</div>
   <h1>숲에 생존</h1>
   <div class="sub">FOREST SURVIVAL</div>
-  <div class="hint">비행기가 추락했다. 숲에서 살아남아라.<br>10일째 헬기가 온다… 근데 그 헬기, 믿어도 될까?</div>
+  <div class="hint">비행기가 추락했다. 숲에서 살아남아라.<br>헬기는 다 함정! <b>3번</b> 이기고 <b>보스(곰·드래곤)</b>도 잡아야 진짜 탈출!</div>
   <button class="btn" id="startBtn">시작</button>
 </div>
 
@@ -227,6 +227,7 @@ const S = {
   alive:true, mode:"title",
   near:null,
   heliActive:false, heliObj:null, heliTimer:0, heliPos:null, _heliSpawnedDay:null,
+  heliRound:0, cineAction:null,
 };
 
 const FOOD_KEYS = ["cookedmeat","rawmeat","cookedfish","rawfish","herb","berry"];
@@ -916,7 +917,9 @@ function boardHeli(){
   removeHelicopter();
   S.mode="heli";
   document.getElementById("heli").classList.add("show");
-  HE.enemies=[]; HE.timer=40; HE.myhp=100; HE.phase="fight"; HE.running=true; HE.shootCd=2.2;
+  const round=S.heliRound+1;
+  const ehp=120+(round-1)*70, edmg=20+(round-1)*10;
+  HE.enemies=[]; HE.timer=40; HE.myhp=100; HE.phase="fight"; HE.running=true; HE.shootCd=2.2; HE.enemyDmg=edmg; HE.round=round;
   const wrap=document.getElementById("enemies"); wrap.innerHTML="";
   const fakeIdx=Math.floor(Math.random()*3);
   for(let i=0;i<3;i++){
@@ -924,11 +927,11 @@ function boardHeli(){
     el.innerHTML='<div class="face">🧑‍✈️</div><div class="ehp"><i style="width:100%"></i></div><div class="tag"></div>';
     el.addEventListener("click",()=>tapEnemy(i));
     wrap.appendChild(el);
-    HE.enemies.push({hp:120, max:120, dead:false, confirmed:false, fake:(i===fakeIdx), el});
+    HE.enemies.push({hp:ehp, max:ehp, dead:false, confirmed:false, fake:(i===fakeIdx), el});
   }
   document.getElementById("hPilot").style.display="none";
   document.getElementById("hAttack").style.display="";
-  setHeliInfo("총 든 적 3명! 숲에서 만든 무기로 다 처치해! (제한 40초)");
+  setHeliInfo((round>1?round+"번째 헬기! 적이 더 강해졌다! ":"")+"총 든 적 3명 처치! (체력"+ehp+"·총"+edmg+"뎀·40초)");
   updateHeliUI();
 }
 document.getElementById("hAttack").addEventListener("click",()=>heliAttack());
@@ -963,7 +966,34 @@ function heliAttack(forced){
   updateHeliUI();
 }
 function flashEnemy(e){ const f=e.el.querySelector(".face"); f.style.transform="translateX(6px)"; setTimeout(()=>{ if(e.el) f.style.transform=e.el.classList.contains("dead")?"":""; },100); }
-function pilotEscape(){ if(HE.phase!=="win") return; HE.running=false; document.getElementById("heli").classList.remove("show"); winCinematic(); }
+function pilotEscape(){ if(HE.phase!=="win") return; HE.running=false; document.getElementById("heli").classList.remove("show"); resolveHeliWin(); }
+function resolveHeliWin(){
+  S.heliRound++;
+  const bearsAlive=animals.filter(a=>a.type==="bear"&&a.alive).length;
+  const dragonAlive=animals.some(a=>a.type==="dragon"&&a.alive);
+  const bossesDead = (bearsAlive===0 && !dragonAlive);
+  if(S.heliRound>=3 && bossesDead){ winCinematic(); return; }
+  crashBackCinematic(bearsAlive, dragonAlive);
+}
+function crashBackCinematic(bearsAlive,dragonAlive){
+  S.mode="cine"; document.getElementById("cine").classList.add("show");
+  setCine("🚁💥","또 다른 헬기가 공격했다!","다시 숲으로 추락… (고기·아이템은 그대로!)");
+  document.getElementById("cineBtn").style.display="none"; S.cineAction=null;
+  setTimeout(()=>{
+    const need=[];
+    if(S.heliRound<3) need.push("헬기 "+(3-S.heliRound)+"번 더 처치");
+    if(bearsAlive>0) need.push("🐻곰 "+bearsAlive+"마리");
+    if(dragonAlive) need.push("🐉드래곤");
+    setCine("🌲","숲으로 돌아왔다 ("+S.heliRound+"/3 처치)", need.length?("진짜 탈출하려면: "+need.join(", ")):"준비 끝! 다음 헬기를 타라!");
+    const b=document.getElementById("cineBtn"); b.style.display=""; b.textContent="계속 생존하기"; S.cineAction=returnToForest;
+  },2600);
+}
+function returnToForest(){
+  document.getElementById("cine").classList.remove("show");
+  S.cineAction=null; S.mode="play";
+  S.heliActive=false; S.heliPos=null; S._heliSpawnedDay=S.day;
+  bigMsg(S.heliRound<3?("다시 숲! 헬기 "+(3-S.heliRound)+"번 더 이겨야 해!"):"보스를 마저 잡고 다음 헬기를 타라!");
+}
 function setHeliInfo(t){ document.getElementById("heliInfo").textContent=t; }
 function updateHeliUI(){
   document.getElementById("heliTimer").textContent=Math.max(0,Math.ceil(HE.timer));
@@ -977,7 +1007,7 @@ function updateHeli(dt){
     HE.shootCd-=dt;
     if(HE.shootCd<=0){
       HE.shootCd=2.2;
-      if(HE.enemies.some(e=>!e.dead)){ HE.myhp-=20; whiteFlash(); shakeScreen();
+      if(HE.enemies.some(e=>!e.dead)){ HE.myhp-=(HE.enemyDmg||20); whiteFlash(); shakeScreen();
         if(HE.myhp<=0){ HE.myhp=0; loseHeli(false); return; } }
     }
     if(HE.timer<=0){ loseHeli(false); return; }
@@ -991,7 +1021,7 @@ function loseHeli(fakeRevive){ HE.running=false; document.getElementById("heli")
 // ---------- 시네마틱 ----------
 function setCine(emo,txt,sub){ document.getElementById("cineEmo").textContent=emo; document.getElementById("cineText").innerHTML=txt; document.getElementById("cineSub").textContent=sub||""; }
 function winCinematic(){
-  S.mode="cine"; document.getElementById("cine").classList.add("show");
+  S.mode="cine"; document.getElementById("cine").classList.add("show"); S.cineAction=null;
   setCine("😆","문을 열어 적을 던져버렸다!","\"하하하하!\"");
   document.getElementById("cineBtn").style.display="none";
   setTimeout(()=>setCine("🚁","헬기를 조종해서 집으로…",""),2200);
@@ -1001,7 +1031,7 @@ function winCinematic(){
   },4600);
 }
 function loseCinematic(fakeRevive){
-  S.mode="cine"; document.getElementById("cine").classList.add("show");
+  S.mode="cine"; document.getElementById("cine").classList.add("show"); S.cineAction=null;
   if(fakeRevive) setCine("😨","죽은 줄 알았던 적이 일어났다…","총을 머리에 가까이 댄다…");
   else setCine("🔫","적이 멀리서 총을 겨눈다…","…슬로우모션…");
   document.getElementById("cineBtn").style.display="none";
@@ -1012,11 +1042,11 @@ function loseCinematic(fakeRevive){
   },3600);
 }
 function deathCinematic(reason){
-  S.alive=false; S.mode="cine"; document.getElementById("cine").classList.add("show");
+  S.alive=false; S.mode="cine"; document.getElementById("cine").classList.add("show"); S.cineAction=null;
   setCine("💀","죽었다…",reason+" · "+S.day+"일째");
   const b=document.getElementById("cineBtn"); b.style.display=""; b.textContent="타이틀로";
 }
-document.getElementById("cineBtn").addEventListener("click",()=>location.reload());
+document.getElementById("cineBtn").addEventListener("click",()=>{ if(S.cineAction){ S.cineAction(); } else { location.reload(); } });
 
 // ---------- 효과 ----------
 function toast(t){ const m=document.getElementById("msg"); m.textContent=t; m.style.opacity="1"; clearTimeout(m._t); m._t=setTimeout(()=>m.style.opacity="0",1600); }
