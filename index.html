@@ -1081,16 +1081,11 @@ function heliAttack(forced){
 function flashEnemy(e){ const f=e.el.querySelector(".face"); f.style.transform="translateX(6px)"; setTimeout(()=>{ if(e.el) f.style.transform=e.el.classList.contains("dead")?"":""; },100); }
 function pilotEscape(){ if(HE.phase!=="win") return; HE.running=false; document.getElementById("heli").classList.remove("show"); resolveHeliWin(); }
 function resolveHeliWin(){
-  S.heliRound++;
   const bearsAlive=animals.filter(a=>a.type==="bear"&&a.alive).length;
   const dragonAlive=animals.some(a=>a.type==="dragon"&&a.alive);
   const bossesDead = (bearsAlive===0 && !dragonAlive);
-  if(S.heliRound>=3){
-    if(bossesDead) winCinematic();
-    else bossSmashCinematic(bearsAlive, dragonAlive);   // 보스 안 잡고 탈출 시도 → 추락사
-  } else {
-    crashBackCinematic(bearsAlive, dragonAlive);
-  }
+  if(bossesDead) winCinematic();
+  else bossSmashCinematic(bearsAlive, dragonAlive);   // 보스 안 잡고 탈출 시도 → 추락사
 }
 function bossSmashCinematic(bearsAlive,dragonAlive){
   S.mode="cine"; document.getElementById("cine").classList.add("show"); S.cineAction=null;
