@@ -652,6 +652,27 @@ joyEl.addEventListener("mousedown",joyStart);
 addEventListener("mousemove",e=>{ if(joy.active && !('ontouchstart' in window)) joyMove(e); });
 addEventListener("mouseup",e=>{ if(joy.active && !('ontouchstart' in window)) joyEnd(e); });
 
+// 카메라 360도 회전 (빈 화면 드래그)
+let camYaw=0, camPitch=0.62;
+const look={active:false,id:null,lx:0,ly:0};
+function lookStart(e){ const t=e.changedTouches?e.changedTouches[0]:e; look.active=true; look.id=t.identifier; look.lx=t.clientX; look.ly=t.clientY; }
+function lookMove(e){
+  if(!look.active) return;
+  let t=e;
+  if(e.changedTouches){ t=null; for(const c of e.changedTouches){ if(c.identifier===look.id){t=c;break;} } if(!t) return; }
+  const dx=t.clientX-look.lx, dy=t.clientY-look.ly; look.lx=t.clientX; look.ly=t.clientY;
+  camYaw -= dx*0.006;
+  camPitch = Math.max(0.16, Math.min(1.35, camPitch - dy*0.005));
+}
+function lookEnd(e){ if(e.changedTouches){ let f=false; for(const c of e.changedTouches){ if(c.identifier===look.id) f=true; } if(!f) return; } look.active=false; }
+const cEl=document.getElementById("c");
+cEl.addEventListener("touchstart",lookStart,{passive:true});
+cEl.addEventListener("touchmove",lookMove,{passive:true});
+cEl.addEventListener("touchend",lookEnd,{passive:true});
+cEl.addEventListener("mousedown",lookStart);
+addEventListener("mousemove",e=>{ if(look.active && !('ontouchstart' in window)) lookMove(e); });
+addEventListener("mouseup",e=>{ if(look.active && !('ontouchstart' in window)) lookEnd(e); });
+
 let bowHolding=false;
 const bAtk=document.getElementById("bAttack");
 bAtk.addEventListener("touchstart",e=>{e.preventDefault();attackDown();},{passive:false});
@@ -1277,8 +1298,11 @@ function updatePlayer(dt){
   const mag=Math.hypot(mx,mz);
   if(mag>0.15){
     let spd = (S.stamina<=0)?3:6;
-    playerYaw=Math.atan2(mx,mz);
-    let nx=player.position.x+mx*spd*dt, nz=player.position.z+mz*spd*dt;
+    // 카메라 방향 기준 이동
+    const fx=Math.sin(camYaw), fz=Math.cos(camYaw), rx=Math.cos(camYaw), rz=-Math.sin(camYaw);
+    const mvx=fx*(-mz)+rx*mx, mvz=fz*(-mz)+rz*mx;
+    playerYaw=Math.atan2(mvx,mvz);
+    let nx=player.position.x+mvx*spd*dt, nz=player.position.z+mvz*spd*dt;
     if(walls.length){ const np={x:nx,z:nz}; resolveWalls(np,0.5); nx=np.x; nz=np.z; }
     if(Math.hypot(nx,nz)<MAP){ player.position.x=nx; player.position.z=nz; }
     player.rotation.y=playerYaw;
@@ -1488,12 +1512,14 @@ function updateDrops(dt){
   }
 }
 function updateCamera(dt){
-  const off=new THREE.Vector3(0,9,12);
-  const target=player.position.clone().add(off);
-  camera.position.lerp(target,0.12);
-  const look=player.position.clone(); look.y+=1.2;
+  const dist=12, horiz=dist*Math.cos(camPitch);
+  const cx=player.position.x - Math.sin(camYaw)*horiz;
+  const cz=player.position.z - Math.cos(camYaw)*horiz;
+  const cy=player.position.y + dist*Math.sin(camPitch) + 1.5;
+  camera.position.lerp(new THREE.Vector3(cx,cy,cz), 0.18);
+  const lk=player.position.clone(); lk.y+=1.2;
   if(shake>0){ camera.position.x+=rnd(-shake,shake); camera.position.y+=rnd(-shake,shake); shake-=dt*2; }
-  camera.lookAt(look);
+  camera.lookAt(lk);
   sun.position.set(player.position.x+30, 60, player.position.z+20);
   sun.target.position.copy(player.position);
 }
@@ -1643,6 +1669,7 @@ function startGame(){
   updateWeaponMesh();
   requestAnimationFrame(loop);
   bigMsg(NET.active ? "👥 멀티 생존 시작!" : "✈️💥 비행기 추락! 살아남아라!");
+  setTimeout(()=>toast("💡 빈 화면을 손가락으로 드래그하면 카메라 360° 회전!"),2800);
 }
 document.getElementById("startBtn").addEventListener("click",startGame);
 document.getElementById("mpBtn").addEventListener("click",()=>{ document.getElementById("mpBox").classList.remove("hidden"); document.getElementById("mpBtn").style.display="none"; SFX.resume(); });
