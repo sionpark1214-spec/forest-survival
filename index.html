@@ -342,7 +342,7 @@ function buildWorld(){
     if(tries>=10) continue;
     trees.push(makeTree(x,z));
   }
-  for(let i=0;i<230;i++){ let x=rnd(-MAP,MAP),z=rnd(-MAP,MAP); if(inRiver(x,z)||Math.hypot(x,z)<5) continue; rocks.push(makeRock(x,z)); }
+  for(let i=0;i<320;i++){ let x=rnd(-MAP,MAP),z=rnd(-MAP,MAP); if(inRiver(x,z)||Math.hypot(x,z)<5) continue; rocks.push(makeRock(x,z)); }
   for(let i=0;i<160;i++){ let x=rnd(-MAP,MAP),z=rnd(-MAP,MAP); if(inRiver(x,z)||Math.hypot(x,z)<5) continue; bushes.push(makeBush(x,z)); }
   for(let i=0;i<100;i++){ let x=rnd(-MAP,MAP),z=rnd(-MAP,MAP); if(inRiver(x,z)||Math.hypot(x,z)<5) continue; herbs.push(makeHerb(x,z)); }
   for(const r of rivers){ for(let i=0;i<4;i++) fishes.push(makeFish(r)); }
