@@ -502,15 +502,15 @@ function mkLimb(mat,x,y,parent,end){
 
 // ---------- 동물 ----------
 const ANIMAL_DEF={
-  chicken:{emoji:"🐔",color:0xf5f0e0,hp:10,dmg:0,meat:15,danger:false,speed:3,count:40,size:0.5},
-  rabbit :{emoji:"🐰",color:0xddddd5,hp:8,dmg:0,meat:12,danger:false,speed:4,count:30,size:0.45},
-  deer   :{emoji:"🦌",color:0xb07a3a,hp:18,dmg:0,meat:28,danger:false,speed:5.5,count:25,size:0.85},
-  fox    :{emoji:"🦊",color:0xe07a2a,hp:14,dmg:6,meat:14,danger:true,speed:4.6,count:18,size:0.5},
-  snake  :{emoji:"🐍",color:0x6a8f2a,hp:15,dmg:8,meat:15,danger:true,speed:2.6,count:50,size:0.4,poison:true},
-  pig    :{emoji:"🐷",color:0xe8a0b0,hp:40,dmg:12,meat:35,danger:true,speed:2.4,count:20,size:0.8},
-  wolf   :{emoji:"🐺",color:0x888d92,hp:30,dmg:15,meat:30,danger:true,speed:4.2,count:25,size:0.7},
-  tiger  :{emoji:"🐯",color:0xe8902a,hp:70,dmg:25,meat:50,danger:true,speed:4.5,count:10,size:0.95},
-  bear   :{emoji:"🐻",color:0x6b4423,hp:130,dmg:35,meat:80,danger:true,speed:2.8,count:6,size:1.3,boss:true},
+  chicken:{emoji:"🐔",color:0xf5f0e0,hp:10,dmg:0,meat:15,danger:false,speed:3,count:50,size:0.5},
+  rabbit :{emoji:"🐰",color:0xddddd5,hp:8,dmg:0,meat:12,danger:false,speed:4,count:40,size:0.45},
+  deer   :{emoji:"🦌",color:0xb07a3a,hp:18,dmg:0,meat:28,danger:false,speed:5.5,count:35,size:0.85},
+  fox    :{emoji:"🦊",color:0xe07a2a,hp:14,dmg:6,meat:14,danger:true,speed:4.6,count:28,size:0.5},
+  snake  :{emoji:"🐍",color:0x6a8f2a,hp:15,dmg:8,meat:15,danger:true,speed:2.6,count:60,size:0.4,poison:true},
+  pig    :{emoji:"🐷",color:0xe8a0b0,hp:40,dmg:12,meat:35,danger:true,speed:2.4,count:30,size:0.8},
+  wolf   :{emoji:"🐺",color:0x888d92,hp:30,dmg:15,meat:30,danger:true,speed:4.2,count:35,size:0.7},
+  tiger  :{emoji:"🐯",color:0xe8902a,hp:70,dmg:25,meat:50,danger:true,speed:4.5,count:20,size:0.95},
+  bear   :{emoji:"🐻",color:0x6b4423,hp:130,dmg:35,meat:80,danger:true,speed:2.8,count:16,size:1.3,boss:true},
   dragon :{emoji:"🐉",color:0x7a4ab0,hp:500,dmg:50,meat:200,danger:true,speed:3.4,count:1,size:2.2,boss:true,fly:true,flyH:8,electro:true},
 };
 function playerMult(){ return NET.active ? (NET.playerN||1) : 1; }
