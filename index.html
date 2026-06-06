@@ -116,6 +116,17 @@
   #cineBtn { margin-top: 28px; display:none; }
 
   .hidden { display: none !important; }
+
+  /* 멀티 로비 */
+  #mpBox { margin-top:16px; width:100%; max-width:320px; display:flex; flex-direction:column; align-items:center; gap:10px; }
+  #mpBox input { width:100%; padding:12px 14px; border-radius:12px; border:2px solid rgba(120,200,140,0.4); background:rgba(255,255,255,0.1); color:#eaf6ea; font-size:16px; font-weight:700; text-align:center; }
+  #mpBox input::placeholder { color:#7fa388; }
+  .mpRow { display:flex; gap:8px; width:100%; }
+  .btn.mpb { margin-top:0; padding:12px 18px; font-size:16px; flex-shrink:0; }
+  #codeInput { text-transform:uppercase; letter-spacing:3px; }
+  #mpStatus { font-size:14px; font-weight:800; color:#ffd36a; min-height:20px; text-align:center; }
+  #mpPlayers { font-size:14px; color:#aef0b2; font-weight:700; text-align:center; line-height:1.6; }
+  #mpCode { font-size:30px; font-weight:900; letter-spacing:6px; color:#aef0b2; }
 </style>
 </head>
 <body>
@@ -127,7 +138,21 @@
   <h1>숲에 생존</h1>
   <div class="sub">FOREST SURVIVAL</div>
   <div class="hint">비행기가 추락했다. 숲에서 살아남아라.<br>헬기는 다 함정! <b>3번</b> 이기고 <b>보스(곰·드래곤)</b>도 잡아야 진짜 탈출!</div>
-  <button class="btn" id="startBtn">시작</button>
+  <button class="btn" id="startBtn">혼자 하기</button>
+  <button class="btn" id="mpBtn" style="background:linear-gradient(180deg,#9ad0ff,#3f8fe0);margin-top:12px;">같이 하기 (최대 4명)</button>
+  <div id="mpBox" class="hidden">
+    <input id="nameInput" placeholder="내 이름 (예: 시온)" maxlength="8" />
+    <div class="mpRow">
+      <button class="btn mpb" id="hostBtn">방 만들기</button>
+    </div>
+    <div class="mpRow">
+      <input id="codeInput" placeholder="방 코드 4글자" maxlength="4" />
+      <button class="btn mpb" id="joinBtn">참가</button>
+    </div>
+    <div id="mpStatus"></div>
+    <div id="mpPlayers"></div>
+    <button class="btn" id="mpStartBtn" style="display:none;">게임 시작!</button>
+  </div>
 </div>
 
 <!-- HUD -->
@@ -199,6 +224,7 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
 "use strict";
 /* =========================================================
@@ -290,7 +316,7 @@ function initThree(){
   const sc = sun.shadow.camera; sc.near=1; sc.far=200; sc.left=-70; sc.right=70; sc.top=70; sc.bottom=-70;
   scene.add(sun); scene.add(sun.target);
 
-  buildWorld();
+  _useSeed=true; buildWorld(); _useSeed=false;
   buildPlayer();
   spawnAnimals();
   addEventListener("resize", onResize);
@@ -302,7 +328,11 @@ function onResize(){
 }
 
 // ---------- 월드 ----------
-function rnd(a,b){ return a + Math.random()*(b-a); }
+// 시드 랜덤: 월드 생성 때만 켜서 모든 플레이어가 같은 숲을 보게
+let _useSeed=false, _seed=1;
+function setSeed(s){ _seed=(s>>>0)||1; }
+function rand(){ if(_useSeed){ _seed=(_seed*1664525+1013904223)>>>0; return _seed/4294967296; } return Math.random(); }
+function rnd(a,b){ return a + rand()*(b-a); }
 function inRiver(x,z){ for(const r of rivers){ if(x>r.minX&&x<r.maxX&&z>r.minZ&&z<r.maxZ) return true; } return false; }
 function buildWorld(){
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(MAP*2+40, MAP*2+40),
@@ -330,7 +360,7 @@ function buildWorld(){
       new THREE.MeshLambertMaterial({color:0x2f7fd6, transparent:true, opacity:0.82}));
     m.rotation.x=-Math.PI/2; m.position.set(cx,0.06,cz); scene.add(m); waterMeshes.push(m);
     // 물가 돌멩이
-    for(let i=0;i<5;i++){ const st=new THREE.Mesh(new THREE.DodecahedronGeometry(rnd(0.2,0.4),0), new THREE.MeshLambertMaterial({color:0x9a9a92})); st.position.set(rnd(r.minX,r.maxX),0.1,(Math.random()<0.5?r.minZ-0.5:r.maxZ+0.5)); scene.add(st); }
+    for(let i=0;i<5;i++){ const st=new THREE.Mesh(new THREE.DodecahedronGeometry(rnd(0.2,0.4),0), new THREE.MeshLambertMaterial({color:0x9a9a92})); st.position.set(rnd(r.minX,r.maxX),0.1,(rand()<0.5?r.minZ-0.5:r.maxZ+0.5)); scene.add(st); }
   }
   const spring = new THREE.Mesh(new THREE.CircleGeometry(3.2,24), new THREE.MeshLambertMaterial({color:0x6fd0ff,transparent:true,opacity:0.9}));
   spring.rotation.x=-Math.PI/2; spring.position.copy(springPos); spring.position.y=0.05; scene.add(spring);
@@ -373,12 +403,12 @@ const TRUNK_MATS=[0x6b4423,0x7a5230,0x5e3a1c].map(c=>new THREE.MeshLambertMateri
 const LEAF_MATS=GREENS.map(c=>new THREE.MeshLambertMaterial({color:c}));
 function makeTree(x,z){
   const g=new THREE.Group(); const h=rnd(4.5,7.5);
-  const trunk=new THREE.Mesh(new THREE.CylinderGeometry(0.28,0.55,h,6), TRUNK_MATS[Math.floor(Math.random()*TRUNK_MATS.length)]);
+  const trunk=new THREE.Mesh(new THREE.CylinderGeometry(0.28,0.55,h,6), TRUNK_MATS[Math.floor(rand()*TRUNK_MATS.length)]);
   trunk.position.y=h/2; g.add(trunk);
-  if(Math.random()<0.5){
+  if(rand()<0.5){
     for(let i=0;i<3;i++){ const cone=new THREE.Mesh(new THREE.ConeGeometry(2.6-i*0.6,2.4,7), LEAF_MATS[i%LEAF_MATS.length]); cone.position.y=h-1+i*1.5; g.add(cone); }
   } else {
-    for(let i=0;i<3;i++){ const r=rnd(1.5,2.3); const b=new THREE.Mesh(new THREE.SphereGeometry(r,7,6), LEAF_MATS[Math.floor(Math.random()*LEAF_MATS.length)]); b.position.set(rnd(-1.2,1.2),h+rnd(-0.3,1.4),rnd(-1.2,1.2)); g.add(b); }
+    for(let i=0;i<3;i++){ const r=rnd(1.5,2.3); const b=new THREE.Mesh(new THREE.SphereGeometry(r,7,6), LEAF_MATS[Math.floor(rand()*LEAF_MATS.length)]); b.position.set(rnd(-1.2,1.2),h+rnd(-0.3,1.4),rnd(-1.2,1.2)); g.add(b); }
   }
   g.position.set(x,0,z); g.rotation.y=rnd(0,6.28); g.scale.setScalar(rnd(0.8,1.25)); scene.add(g);
   return {grp:g, hp:5, type:"tree"};
@@ -395,7 +425,7 @@ function makeRock(x,z){
 function makeBush(x,z){
   const g=new THREE.Group();
   for(let i=0;i<4;i++){
-    const b=new THREE.Mesh(new THREE.SphereGeometry(rnd(0.6,1.05),7,6), new THREE.MeshLambertMaterial({color:GREENS[Math.floor(Math.random()*GREENS.length)]}));
+    const b=new THREE.Mesh(new THREE.SphereGeometry(rnd(0.6,1.05),7,6), LEAF_MATS[Math.floor(rand()*LEAF_MATS.length)]);
     b.position.set(rnd(-0.7,0.7),rnd(0.45,0.95),rnd(-0.7,0.7)); b.castShadow=true; g.add(b);
   }
   // 빨간 열매
@@ -1152,6 +1182,7 @@ function loop(t){
   updateCamera(dt);
   updateHUD();
   cullFrame++; if(cullFrame%12===0) cullWorld();
+  if(NET.active){ netTick(dt); netRenderRemotes(dt); }
   if(renderer) renderer.render(scene,camera);
 }
 let cullFrame=0;
@@ -1409,19 +1440,132 @@ function drawMap(){
   mapCtx.fillStyle="#fff"; mapCtx.beginPath(); mapCtx.arc(px(player.position.x),pz(player.position.z),3,0,7); mapCtx.fill();
 }
 
+// ---------- 멀티플레이 (PeerJS, 최대 4명) ----------
+const NET={
+  active:false, isHost:false, peer:null, code:null, seed:0, name:"", selfId:"host",
+  conns:[], host:null, states:{}, meshes:{}, started:false, sendAcc:0,
+};
+function mpStatus(t){ document.getElementById("mpStatus").textContent=t; }
+function randCode(){ const L="ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let s=""; for(let i=0;i<4;i++) s+=L[Math.floor(Math.random()*L.length)]; return s; }
+function myName(){ const v=(document.getElementById("nameInput").value||"").trim(); return (v||("생존자"+Math.floor(Math.random()*90+10))).slice(0,8); }
+function refreshPlayers(){
+  const names=[NET.name+(NET.isHost?" 👑":"")];
+  for(const id in NET.states){ if(NET.states[id]&&NET.states[id].name) names.push(NET.states[id].name); }
+  const el=document.getElementById("mpPlayers"); if(el) el.innerHTML="👥 "+names.join(", ")+"  ("+names.length+"/4)";
+}
+function netHost(){
+  if(typeof Peer==="undefined"){ mpStatus("통신 로딩 실패 (인터넷 확인)"); return; }
+  NET.active=true; NET.isHost=true; NET.name=myName(); NET.selfId="host";
+  NET.seed=Math.floor(Math.random()*1e9)+1; NET.code=randCode();
+  document.getElementById("hostBtn").disabled=true; document.getElementById("joinBtn").disabled=true;
+  mpStatus("방 만드는 중…");
+  NET.peer=new Peer("forestsv-"+NET.code);
+  NET.peer.on("open",()=>{ document.getElementById("mpStatus").innerHTML='방 코드: <span id="mpCode">'+NET.code+'</span><br>친구한테 알려줘! 다 모이면 시작 눌러!'; document.getElementById("mpStartBtn").style.display=""; refreshPlayers(); });
+  NET.peer.on("error",e=>{ mpStatus("에러("+e.type+") 다시 시도"); document.getElementById("hostBtn").disabled=false; });
+  NET.peer.on("connection",conn=>{
+    if(NET.conns.length>=3){ conn.on("open",()=>conn.send({t:"full"})); return; }
+    NET.conns.push(conn);
+    conn.on("open",()=>{ conn.send({t:"welcome",seed:NET.seed}); if(NET.started) conn.send({t:"go"}); });
+    conn.on("data",m=>{
+      if(m.t==="hello"){ NET.states[conn.peer]=Object.assign(NET.states[conn.peer]||{},{name:m.name}); }
+      else if(m.t==="state"){ NET.states[conn.peer]=Object.assign(NET.states[conn.peer]||{}, m.s); }
+      refreshPlayers();
+    });
+    conn.on("close",()=>{ NET.conns=NET.conns.filter(c=>c!==conn); delete NET.states[conn.peer]; removeRemote(conn.peer); refreshPlayers(); });
+    refreshPlayers();
+  });
+}
+function netJoin(){
+  if(typeof Peer==="undefined"){ mpStatus("통신 로딩 실패 (인터넷 확인)"); return; }
+  const code=((document.getElementById("codeInput").value||"").trim().toUpperCase());
+  if(code.length!==4){ mpStatus("코드 4글자를 입력해!"); return; }
+  NET.active=true; NET.isHost=false; NET.name=myName();
+  document.getElementById("hostBtn").disabled=true; document.getElementById("joinBtn").disabled=true;
+  mpStatus("연결 중…");
+  NET.peer=new Peer();
+  NET.peer.on("open",()=>{
+    NET.selfId=NET.peer.id;
+    const conn=NET.peer.connect("forestsv-"+code);
+    NET.host=conn;
+    conn.on("open",()=>{ conn.send({t:"hello",name:NET.name}); mpStatus("연결됐어! 방장이 시작하길 기다려…"); });
+    conn.on("data",m=>{
+      if(m.t==="welcome"){ NET.seed=m.seed; }
+      else if(m.t==="go"){ if(!NET.started){ NET.started=true; startGame(); } }
+      else if(m.t==="snapshot"){ const ps=m.players||{}, ns={}; for(const id in ps){ if(id!==NET.selfId) ns[id]=ps[id]; } NET.states=ns; }
+      else if(m.t==="full"){ mpStatus("방이 꽉 찼어 (4명)"); }
+    });
+    conn.on("close",()=>mpStatus("연결이 끊겼어"));
+  });
+  NET.peer.on("error",e=>{ mpStatus("에러("+e.type+") 코드 확인!"); document.getElementById("joinBtn").disabled=false; });
+}
+function mpStart(){ NET.started=true; for(const c of NET.conns){ try{ c.send({t:"go"}); }catch(e){} } startGame(); }
+function netTick(dt){
+  NET.sendAcc+=dt; if(NET.sendAcc<0.06) return; NET.sendAcc=0;
+  const s={x:Math.round(player.position.x*100)/100, z:Math.round(player.position.z*100)/100, yaw:Math.round(playerYaw*100)/100, walk:(Math.hypot(joy.x,joy.y)>0.15?1:0), weapon:S.weapon, hp:Math.round(S.hp), name:NET.name};
+  if(NET.isHost){
+    const players={}; players[NET.selfId]=s;
+    for(const id in NET.states){ players[id]=NET.states[id]; }
+    const snap={t:"snapshot",players};
+    for(const c of NET.conns){ if(c.open){ try{ c.send(snap); }catch(e){} } }
+  } else if(NET.host && NET.host.open){
+    try{ NET.host.send({t:"state",s}); }catch(e){}
+  }
+}
+function mkLabel2(txt){
+  const cv=document.createElement("canvas"); cv.width=256; cv.height=64; const c=cv.getContext("2d");
+  c.fillStyle="rgba(0,0,0,0.45)"; c.fillRect(0,0,256,64);
+  c.font="bold 38px sans-serif"; c.textAlign="center"; c.textBaseline="middle"; c.fillStyle="#aef0b2"; c.fillText(txt,128,34);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv),depthTest:false}));
+  sp.scale.set(3.2,0.8,1); return sp;
+}
+const REMOTE_COLORS=[0xffcf6a,0x9ad0ff,0xff9ad0,0xb0ff8a];
+let _remoteIdx=0;
+function makeRemoteChar(name){
+  const g=new THREE.Group();
+  const cloth=REMOTE_COLORS[(_remoteIdx++)%REMOTE_COLORS.length];
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.38,0.78,8), new THREE.MeshLambertMaterial({color:cloth})); body.position.y=1.15; body.castShadow=true; g.add(body);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(0.31,10,8), new THREE.MeshLambertMaterial({color:0xf2c89a})); head.position.y=1.88; head.castShadow=true; g.add(head);
+  const hair=new THREE.Mesh(new THREE.SphereGeometry(0.34,10,8,0,Math.PI*2,0,Math.PI*0.6), new THREE.MeshLambertMaterial({color:0x3a2a1a})); hair.position.y=1.92; g.add(hair);
+  const legMat=new THREE.MeshLambertMaterial({color:0x33405a});
+  const legL=mkLimb(legMat,-0.16,0.78,g,{geo:new THREE.BoxGeometry(0.2,0.13,0.34),mat:new THREE.MeshLambertMaterial({color:0x222222}),fz:0.08});
+  const legR=mkLimb(legMat,0.16,0.78,g,{geo:new THREE.BoxGeometry(0.2,0.13,0.34),mat:new THREE.MeshLambertMaterial({color:0x222222}),fz:0.08});
+  const tag=mkLabel2(name||"?"); tag.position.y=2.55; g.add(tag);
+  scene.add(g);
+  return {grp:g, legL, legR, walk:0, name};
+}
+function removeRemote(id){ const m=NET.meshes[id]; if(m){ scene.remove(m.grp); delete NET.meshes[id]; } }
+function netRenderRemotes(dt){
+  for(const id in NET.states){
+    const st=NET.states[id]; if(!st || st.x===undefined) continue;
+    let m=NET.meshes[id]; if(!m){ m=makeRemoteChar(st.name); NET.meshes[id]=m; }
+    m.grp.position.x += (st.x-m.grp.position.x)*Math.min(1,dt*10);
+    m.grp.position.z += (st.z-m.grp.position.z)*Math.min(1,dt*10);
+    m.grp.rotation.y = st.yaw||0;
+    if(st.walk){ m.walk+=dt*12; const sw=Math.sin(m.walk)*0.5; m.legL.rotation.x=sw; m.legR.rotation.x=-sw; }
+    else { m.legL.rotation.x*=0.8; m.legR.rotation.x*=0.8; }
+  }
+  for(const id in NET.meshes){ if(!NET.states[id]) removeRemote(id); }
+}
+
 // ---------- 시작 ----------
 function startGame(){
   if(!THREE_OK){ alert("3D 로딩 실패 (인터넷 확인)"); return; }
+  if(S.mode!=="title") return;
   document.getElementById("title").style.display="none";
   ["hud","topright","joy","acts","actLabel"].forEach(id=>document.getElementById(id).classList.remove("hidden"));
   SFX.resume();
+  setSeed(NET.active ? NET.seed : (Math.floor(Math.random()*1e9)+1));
   S.mode="play";
   initThree();
   updateWeaponMesh();
   requestAnimationFrame(loop);
-  bigMsg("✈️💥 비행기 추락! 살아남아라!");
+  bigMsg(NET.active ? "👥 멀티 생존 시작!" : "✈️💥 비행기 추락! 살아남아라!");
 }
 document.getElementById("startBtn").addEventListener("click",startGame);
+document.getElementById("mpBtn").addEventListener("click",()=>{ document.getElementById("mpBox").classList.remove("hidden"); document.getElementById("mpBtn").style.display="none"; SFX.resume(); });
+document.getElementById("hostBtn").addEventListener("click",netHost);
+document.getElementById("joinBtn").addEventListener("click",netJoin);
+document.getElementById("mpStartBtn").addEventListener("click",mpStart);
 </script>
 </body>
 </html>
