@@ -1349,12 +1349,15 @@ function updateAnimals(dt){
       continue;
     }
     let tx=0,tz=0;
-    if(a.danger){
-      const aggroR = a.boss?16:6;
+    const isNight=(S.phase==="night");
+    const dgr=a.danger||isNight;                 // 밤엔 순한 동물도 사나워짐
+    const admg=a.dmg>0?a.dmg:(isNight?5:0);       // 원래 공격0인 동물은 밤에 5뎀
+    if(dgr){
+      const aggroR = a.boss?16:(isNight?9:6);
       if(a.aggro || d<aggroR){
         tx=dx/d; tz=dz/d;
         if(d<(a.boss?2.6:1.8) && a.atkCd<=0){
-          a.atkCd=a.boss?1.8:1.4; S.hp-=a.dmg; damageFlash(); shakeScreen();
+          a.atkCd=a.boss?1.8:1.4; S.hp-=admg; damageFlash(); shakeScreen();
           if(a.poison) addPoison();
           if(a.type==="wolf"||a.type==="tiger"||a.type==="bear") SFX.bite();
           if(a.boss) bigMsg("🐻 곰의 공격!");
@@ -1366,18 +1369,18 @@ function updateAnimals(dt){
       if(d<8){ tx=-dx/d; tz=-dz/d; }
       else { if(a.wander<=0){ a.vx=rnd(-1,1); a.vz=rnd(-1,1); a.wander=rnd(2,5);} tx=a.vx; tz=a.vz; }
     }
-    const sp=a.speed*( (a.danger&&(a.aggro||d<6))?1:0.5 );
+    const sp=a.speed*( (dgr&&(a.aggro||d<6))?1:0.5 );
     let nx=p.x+tx*sp*dt, nz=p.z+tz*sp*dt;
     if(walls.length){ const np={x:nx,z:nz}; resolveWalls(np,0.6); nx=np.x; nz=np.z; }
     if(Math.hypot(nx,nz)<MAP && !inRiver(nx,nz)){ p.x=nx; p.z=nz; }
     if(tx||tz) a.grp.rotation.y=Math.atan2(tx,tz);
     // 벽에 막히면 벽을 때림
-    if(a.danger && walls.length && a.atkCd<=0){
+    if(dgr && admg>0 && walls.length && a.atkCd<=0){
       for(const w of walls){
         const adx=p.x-w.x, adz=p.z-w.z, u=adx*w.ux+adz*w.uz, v=adx*w.vx+adz*w.vz;
         const pv=(player.position.x-w.x)*w.vx+(player.position.z-w.z)*w.vz;
         if(Math.abs(u)<w.halfW+0.5 && Math.abs(v)<1.4 && (v>=0)!==(pv>=0)){
-          a.atkCd=1.4; w.hp-=a.dmg; shakeObj(w.grp);
+          a.atkCd=1.4; w.hp-=admg; shakeObj(w.grp);
           if(a.type==="wolf"||a.type==="tiger"||a.type==="bear") SFX.bite();
           if(w.hp<=0){ scene.remove(w.grp); const wi=walls.indexOf(w); if(wi>=0)walls.splice(wi,1); toast("🧱 벽이 부서졌다!"); }
           break;
@@ -1404,7 +1407,7 @@ function updateFishBugs(dt){
 function updateDayNight(dt){
   S.phaseTime-=dt;
   if(S.phaseTime<=0){
-    if(S.phase==="day"){ S.phase="night"; S.phaseTime=S.nightLen; bigMsg("🌙 밤이 됐다… 조심해"); }
+    if(S.phase==="day"){ S.phase="night"; S.phaseTime=S.nightLen; bigMsg("🌙 밤이다! 동물들이 사나워진다… 조심!"); }
     else { S.phase="day"; S.day++; S.nightLen+=30; S.phaseTime=180; bigMsg("☀️ "+S.day+"일째 아침"); }
   }
   if(S.day%10===0 && S.phase==="day" && !S.heliActive && S._heliSpawnedDay!==S.day){ spawnHelicopter(); S._heliSpawnedDay=S.day; }
