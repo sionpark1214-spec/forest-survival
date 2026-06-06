@@ -288,7 +288,7 @@ const SFX=(function(){
 const canvas = document.getElementById("c");
 let renderer, scene, camera, sun, hemi, ambient;
 let player, playerYaw=0, playerWalk=0;
-const trees=[], rocks=[], bushes=[], herbs=[], animals=[], fishes=[], bugs=[], drops=[], campfires=[];
+const trees=[], rocks=[], bushes=[], herbs=[], animals=[], fishes=[], bugs=[], drops=[], campfires=[], spikes=[];
 let houseMesh=null;
 const springPos=new THREE.Vector3(20,0,-22);
 const rivers=[];
@@ -813,7 +813,7 @@ function mine(r){
 function gather(b){
   useStamina(4); S.mat.vine += 2;
   let m="덩굴 +2 🌿";
-  if(Math.random()<0.4 && addFood("berry",1)) m+=" + 열매 🫐";
+  if(Math.random()<0.5 && addFood("berry",1)) m+=" + 열매 🫐";
   shakeObj(b.grp); toast(m);
   b.hp--; if(b.hp<=0){ scene.remove(b.grp); const i=bushes.indexOf(b); if(i>=0)bushes.splice(i,1); }
 }
@@ -866,6 +866,7 @@ const RECIPES=[
   {id:"bow", name:"활", emoji:"🏹", cost:{wood:5}, desc:"데미지13(꾹눌러 차징) · 내구30", make(){ S.has.bow=true; S.dur.bow=30; S.weapon="bow"; }},
   {id:"arrow", name:"화살 x2", emoji:"➶", cost:{wood:4,stone:1}, desc:"활에 필요 (최대 100)", make(){ S.mat.arrow=Math.min(100,S.mat.arrow+2); }},
   {id:"fire", name:"모닥불", emoji:"🔥", cost:{wood:3,stone:2}, desc:"체온↑ 힘↑ 회복 · 요리", make(){ placeCampfire(); }},
+  {id:"spike", name:"나무 스파이크", emoji:"🌵", cost:{wood:6}, desc:"바닥에 설치 · 동물이 밟으면 아픔(나는 안전!)", make(){ placeSpike(); }},
 ];
 const HOUSES=[
   {id:"h1", name:"엉성한 나무집", emoji:"🛖", cost:{wood:15,stone:3}, rate:1/60, prot:0.3, desc:"체력 1분에 1"},
@@ -901,6 +902,30 @@ function placeCampfire(){
   const light=new THREE.PointLight(0xff8a3a,1.4,12); light.position.y=1.2; g.add(light);
   g.position.set(x,0,z); scene.add(g);
   campfires.push({grp:g, x, z, fire});
+}
+function placeSpike(){
+  const fx=Math.sin(playerYaw), fz=Math.cos(playerYaw);
+  const x=player.position.x+fx*2.2, z=player.position.z+fz*2.2;
+  const g=new THREE.Group();
+  const base=new THREE.Mesh(new THREE.CylinderGeometry(1.0,1.1,0.14,8), new THREE.MeshLambertMaterial({color:0x5a3a1a})); base.position.y=0.07; g.add(base);
+  const spikeMat=new THREE.MeshLambertMaterial({color:0x9a7a4a});
+  for(let i=0;i<8;i++){ const s=new THREE.Mesh(new THREE.ConeGeometry(0.16,rnd(0.8,1.3),5), spikeMat); s.position.set(rnd(-0.7,0.7),0.6,rnd(-0.7,0.7)); s.rotation.set(rnd(-0.15,0.15),0,rnd(-0.15,0.15)); g.add(s); }
+  g.position.set(x,0,z); scene.add(g);
+  spikes.push({grp:g, x, z, hp:90});
+}
+function updateSpikes(dt){
+  for(let i=spikes.length-1;i>=0;i--){
+    const sp=spikes[i];
+    for(const a of animals){ if(!a.alive) continue; if(a.fly) continue;
+      if(Math.hypot(a.grp.position.x-sp.x,a.grp.position.z-sp.z)<1.6){
+        const dmg=16*dt; a.hp-=dmg; sp.hp-=dmg;
+        if(a.danger) a.aggro=true;
+        if(Math.random()<dt*3) bloodFx(a.grp.position);
+        if(a.hp<=0){ a.alive=false; scene.remove(a.grp); dropMeat(a); }
+      }
+    }
+    if(sp.hp<=0){ scene.remove(sp.grp); spikes.splice(i,1); toast("🌵 나무 스파이크가 부서졌다"); }
+  }
 }
 function placeHouse(h){
   if(houseMesh) scene.remove(houseMesh);
@@ -1181,6 +1206,7 @@ function loop(t){
   updatePlayer(dt);
   updateStats(dt);
   updateAnimals(dt);
+  updateSpikes(dt);
   updateFishBugs(dt);
   updateDayNight(dt);
   updateWeather(dt);
