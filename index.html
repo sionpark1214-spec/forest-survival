@@ -1618,7 +1618,10 @@ function netJoin(){
       else if(m.t==="snapshot"){ const ps=m.players||{}, ns={}; for(const id in ps){ if(id!==NET.selfId) ns[id]=ps[id]; } NET.states=ns; }
       else if(m.t==="full"){ mpStatus("방이 꽉 찼어 (4명)"); }
     });
-    conn.on("close",()=>mpStatus("연결이 끊겼어"));
+    conn.on("close",()=>{
+      mpStatus("연결이 끊겼어");
+      if(S.mode==="play"||S.mode==="heli"){ NET.active=false; Object.keys(NET.meshes).forEach(removeRemote); bigMsg("방장이 나갔어! 혼자 이어서 생존 🌲"); }
+    });
   });
   NET.peer.on("error",e=>{ mpStatus("에러("+e.type+") 코드 확인!"); document.getElementById("joinBtn").disabled=false; });
 }
