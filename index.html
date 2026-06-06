@@ -1376,6 +1376,9 @@ function drawMap(){
   mapCtx.fillStyle="#6fd0ff"; mapCtx.beginPath(); mapCtx.arc(px(springPos.x),pz(springPos.z),3,0,7); mapCtx.fill();
   if(S.bedPos){ mapCtx.fillStyle="#ffcf6a"; mapCtx.fillRect(px(S.bedPos.x)-2,pz(S.bedPos.z)-2,4,4); }
   if(S.heliPos){ mapCtx.fillStyle="#ff4a4a"; mapCtx.beginPath(); mapCtx.arc(px(S.heliPos.x),pz(S.heliPos.z),4,0,7); mapCtx.fill(); }
+  // 드래곤 위치(보라 점, 반짝임)
+  const drg = animals.find(a=>a.type==="dragon" && a.alive);
+  if(drg){ const bp=(Math.floor(t0()*3)%2===0); mapCtx.fillStyle=bp?"#c98aff":"#7a2ad0"; mapCtx.beginPath(); mapCtx.arc(px(drg.grp.position.x),pz(drg.grp.position.z),4.5,0,7); mapCtx.fill(); }
   mapCtx.fillStyle="#fff"; mapCtx.beginPath(); mapCtx.arc(px(player.position.x),pz(player.position.z),3,0,7); mapCtx.fill();
 }
 
