@@ -376,7 +376,7 @@ function buildWorld(){
   }
   for(let i=0;i<400;i++){ let x=rnd(-MAP,MAP),z=rnd(-MAP,MAP); if(inRiver(x,z)||Math.hypot(x,z)<5) continue; rocks.push(makeRock(x,z)); }
   for(let i=0;i<160;i++){ let x=rnd(-MAP,MAP),z=rnd(-MAP,MAP); if(inRiver(x,z)||Math.hypot(x,z)<5) continue; bushes.push(makeBush(x,z)); }
-  for(let i=0;i<100;i++){ let x=rnd(-MAP,MAP),z=rnd(-MAP,MAP); if(inRiver(x,z)||Math.hypot(x,z)<5) continue; herbs.push(makeHerb(x,z)); }
+  for(let i=0;i<200;i++){ let x=rnd(-MAP,MAP),z=rnd(-MAP,MAP); if(inRiver(x,z)||Math.hypot(x,z)<5) continue; herbs.push(makeHerb(x,z)); }
   const pm=playerMult();
   for(const r of rivers){ for(let i=0;i<4*pm;i++) fishes.push(makeFish(r)); }
   for(let i=0;i<100*pm;i++) bugs.push(makeBug());
